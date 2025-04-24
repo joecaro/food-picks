@@ -6,22 +6,22 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../auth-provider';
-import { useTournamentsList, useCreateTournament } from '../../lib/hooks/useTournaments';
+import { useFoodFightsList, useCreateFoodFight } from '../../lib/hooks/useFoodFights';
 
-export default function TournamentsPage() {
+export default function FoodFightsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const { data: tournaments, isLoading, error } = useTournamentsList();
-  const createTournament = useCreateTournament();
+  const { data: foodFights, isLoading, error } = useFoodFightsList();
+  const createFoodFight = useCreateFoodFight();
   const router = useRouter();
 
-  const handleCreateTournament = async (name: string) => {
+  const handleCreateFoodFight = async (name: string) => {
     try {
-      const tournament = await createTournament.mutateAsync(name);
+      const foodFight = await createFoodFight.mutateAsync(name);
       setShowCreateForm(false);
-      router.push(`/tournaments/${tournament.id}`);
+      router.push(`/tournaments/${foodFight.id}`);
     } catch (error) {
-      console.error('Failed to create tournament', error);
+      console.error('Failed to create Food Fight', error);
     }
   };
 
@@ -32,7 +32,7 @@ export default function TournamentsPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-3xl font-bold text-gray-900">
-            Tournaments
+            Food Fights
           </h1>
           
           {user ? (
@@ -40,14 +40,14 @@ export default function TournamentsPage() {
               onClick={() => setShowCreateForm(!showCreateForm)}
               className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              {showCreateForm ? 'Cancel' : 'Create Tournament'}
+              {showCreateForm ? 'Cancel' : 'Create Food Fight'}
             </button>
           ) : (
             <Link
               href="/login"
               className="text-blue-600 hover:text-blue-500"
             >
-              Login to create tournaments
+              Login to create Food Fights
             </Link>
           )}
         </div>
@@ -55,13 +55,13 @@ export default function TournamentsPage() {
         {user && showCreateForm && (
           <div className="mb-8">
             <div className="bg-white shadow-sm rounded-lg p-6">
-              <h2 className="text-lg font-medium mb-4">Create a New Tournament</h2>
+              <h2 className="text-lg font-medium mb-4">Create a New Food Fight</h2>
               
-              {createTournament.error && (
+              {createFoodFight.error && (
                 <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
-                  {createTournament.error instanceof Error 
-                    ? createTournament.error.message 
-                    : 'Failed to create tournament'}
+                  {createFoodFight.error instanceof Error 
+                    ? createFoodFight.error.message 
+                    : 'Failed to create Food Fight'}
                 </div>
               )}
               
@@ -70,20 +70,20 @@ export default function TournamentsPage() {
                 const formData = new FormData(e.currentTarget);
                 const name = formData.get('name') as string;
                 if (name) {
-                  handleCreateTournament(name);
+                  handleCreateFoodFight(name);
                 }
               }}>
                 <div className="mb-4">
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Tournament Name
+                    Food Fight Name
                   </label>
                   <input
                     id="name"
                     name="name"
                     type="text"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Lunch tournament"
-                    disabled={createTournament.isPending}
+                    placeholder="Lunch Food Fight"
+                    disabled={createFoodFight.isPending}
                     required
                     minLength={3}
                   />
@@ -91,10 +91,10 @@ export default function TournamentsPage() {
                 
                 <button
                   type="submit"
-                  disabled={createTournament.isPending}
+                  disabled={createFoodFight.isPending}
                   className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  {createTournament.isPending ? 'Creating...' : 'Create Tournament'}
+                  {createFoodFight.isPending ? 'Creating...' : 'Create Food Fight'}
                 </button>
               </form>
             </div>
@@ -108,50 +108,50 @@ export default function TournamentsPage() {
         ) : !user ? (
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <p className="text-center text-gray-500">
-              Please login to view and create tournaments.
+              Please login to view and create Food Fights.
             </p>
           </div>
         ) : error ? (
           <div className="bg-red-50 text-red-700 p-6 rounded-lg shadow-sm">
-            {error instanceof Error ? error.message : 'Failed to load tournaments'}
+            {error instanceof Error ? error.message : 'Failed to load Food Fights'}
           </div>
         ) : (
           <div className="bg-white p-6 rounded-lg shadow-sm">
-            <h2 className="text-lg font-medium mb-4">Tournaments</h2>
+            <h2 className="text-lg font-medium mb-4">Food Fights</h2>
             
-            {tournaments && tournaments.length > 0 ? (
+            {foodFights && foodFights.length > 0 ? (
               <div className="space-y-3">
-                {tournaments.map((tournament) => (
+                {foodFights.map((foodFight) => (
                   <Link
-                    href={`/tournaments/${tournament.id}`}
-                    key={tournament.id}
+                    href={`/tournaments/${foodFight.id}`}
+                    key={foodFight.id}
                     className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
                   >
                     <div className="flex justify-between items-center">
                       <div>
-                        <div className="font-medium">{tournament.name}</div>
+                        <div className="font-medium">{foodFight.name}</div>
                         <div className="text-sm text-gray-500">
-                          {tournament.status === 'nominating' && 'Nomination Phase'}
-                          {tournament.status === 'voting' && `Voting Round ${tournament.current_round}`}
-                          {tournament.status === 'completed' && 'Completed'}
+                          {foodFight.status === 'nominating' && 'Nomination Phase'}
+                          {foodFight.status === 'voting' && `Voting Phase`}
+                          {foodFight.status === 'completed' && 'Completed'}
                         </div>
                       </div>
                       <div>
-                        {tournament.status === 'completed' && tournament.winner && (
+                        {foodFight.status === 'completed' && foodFight.winner && (
                           <div className="text-sm">
                             <span className="font-medium">Winner:</span>{' '}
-                            <span className="text-green-600">{tournament.winner.name}</span>
+                            <span className="text-green-600">{foodFight.winner.name}</span>
                           </div>
                         )}
-                        {tournament.status !== 'completed' && (
+                        {foodFight.status !== 'completed' && (
                           <div
                             className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              tournament.status === 'nominating'
+                              foodFight.status === 'nominating'
                                 ? 'bg-blue-100 text-blue-800'
                                 : 'bg-yellow-100 text-yellow-800'
                             }`}
                           >
-                            {tournament.status === 'nominating' ? 'Nominating' : 'Voting'}
+                            {foodFight.status === 'nominating' ? 'Nominating' : 'Voting'}
                           </div>
                         )}
                       </div>
@@ -160,7 +160,7 @@ export default function TournamentsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500">No tournaments found. Create one to get started!</p>
+              <p className="text-center text-gray-500">No Food Fights found. Create one to get started!</p>
             )}
           </div>
         )}

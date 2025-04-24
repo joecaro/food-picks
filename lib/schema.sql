@@ -2,15 +2,14 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;         -- gen_random_uuid()
 
 -- status enum ---------------------------------------------------------------
-CREATE TYPE tournament_status AS ENUM ('nominating','voting','completed');
+CREATE TYPE food_fight_status AS ENUM ('nominating','voting','completed');
 
 -- core tables ---------------------------------------------------------------
-CREATE TABLE tournaments (
+CREATE TABLE food_fights (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name           text                  NOT NULL,
-  status         tournament_status     NOT NULL DEFAULT 'nominating',
+  status         food_fight_status     NOT NULL DEFAULT 'nominating',
   creator_id     uuid                  NOT NULL,           -- auth/user id
-  current_round  int                   NOT NULL DEFAULT 1,
   end_time       timestamptz           NOT NULL,
   winner         uuid,                                   -- FK added later
   created_at     timestamptz           NOT NULL DEFAULT now()
@@ -18,46 +17,56 @@ CREATE TABLE tournaments (
 
 CREATE TABLE restaurants (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tournament_id uuid        NOT NULL
-                REFERENCES tournaments(id) ON DELETE CASCADE,
+  food_fight_id uuid        NOT NULL
+                REFERENCES food_fights(id) ON DELETE CASCADE,
   name          text        NOT NULL,
   cuisine       text        NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
 -- add the circular FK now that restaurants exists
-ALTER TABLE tournaments
-  ADD CONSTRAINT tournaments_winner_fk
+ALTER TABLE food_fights
+  ADD CONSTRAINT food_fights_winner_fk
   FOREIGN KEY (winner) REFERENCES restaurants(id);
 
-CREATE INDEX restaurants_by_tournament
-  ON restaurants(tournament_id);
+CREATE INDEX restaurants_by_food_fight
+  ON restaurants(food_fight_id);
 
-CREATE TABLE matches (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  tournament_id uuid  NOT NULL
-                REFERENCES tournaments(id) ON DELETE CASCADE,
-  round         int   NOT NULL,
-  restaurant1   uuid  NOT NULL REFERENCES restaurants(id),
-  restaurant2   uuid          REFERENCES restaurants(id),
-  votes1        int   NOT NULL DEFAULT 0,
-  votes2        int   NOT NULL DEFAULT 0,
-  created_at    timestamptz   NOT NULL DEFAULT now()
-);
-
-CREATE INDEX matches_by_tournament_round
-  ON matches(tournament_id, round);
-
-CREATE TABLE votes (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  match_id      uuid NOT NULL REFERENCES matches(id)      ON DELETE CASCADE,
-  user_id       uuid NOT NULL,
-  restaurant_id uuid NOT NULL REFERENCES restaurants(id),
+CREATE TABLE scores (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(), -- Or use composite PK
+  food_fight_id uuid NOT NULL REFERENCES food_fights(id) ON DELETE CASCADE,
+  user_id       uuid NOT NULL, -- Assuming users are managed elsewhere (e.g., auth.users)
+  restaurant_id uuid NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  score         smallint NOT NULL CHECK (score >= 1 AND score <= 5),
   created_at    timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (match_id, user_id)      -- “already voted” guard
+  UNIQUE (food_fight_id, user_id, restaurant_id) -- Ensure one score per user per restaurant
 );
 
-CREATE INDEX votes_by_match_user
-  ON votes(match_id, user_id);
+CREATE INDEX scores_by_food_fight_user
+  ON scores(food_fight_id, user_id);
 
-make.
+CREATE INDEX scores_by_restaurant
+  ON scores(restaurant_id);
+
+
+-- Dropping old tables and indices related to matches/votes
+DROP INDEX IF EXISTS matches_by_tournament_round;
+DROP TABLE IF EXISTS matches;
+
+DROP INDEX IF EXISTS votes_by_match_user;
+DROP TABLE IF EXISTS votes;
+
+
+-- You might need to adjust your application logic to handle the absence
+-- of 'matches' and the new 'scores' table structure.
+-- Also ensure user_id refers to your actual user authentication table/system.
+
+-- Example of querying scores (needs adaptation for your specific auth setup):
+-- SELECT
+--   r.name,
+--   AVG(s.score) as average_score
+-- FROM scores s
+-- JOIN restaurants r ON s.restaurant_id = r.id
+-- WHERE s.food_fight_id = 'your_food_fight_uuid'
+-- GROUP BY r.id, r.name
+-- ORDER BY average_score DESC;

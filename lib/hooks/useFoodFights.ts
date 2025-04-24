@@ -5,44 +5,43 @@ import {
   useQuery, 
   useQueryClient 
 } from '@tanstack/react-query';
+// Import renamed API functions
 import { 
-  createTournament, 
-  getTournament, 
-  listTournaments, 
+  createFoodFight, 
+  getFoodFight, 
+  listFoodFights, 
   nominateRestaurant,
   startVoting,
   checkRoundEnd,
   submitScores,
-  copyTournament,
+  copyFoodFight,
   deleteRestaurant
 } from '../api';
-// import { supabase } from '../supabase'; // Supabase client used in api.ts, not directly here
 
-// Import the result type from API to ensure consistency
-import type { GetTournamentResult } from '../api';
+// Import renamed result type from API
+import type { GetFoodFightResult } from '../api';
 
 // List Food Fights
 export function useFoodFightsList() {
   return useQuery({
     queryKey: ['foodFights'],
-    queryFn: listTournaments,
+    queryFn: listFoodFights, // Use renamed API function
   });
 }
 
-// Using the type imported from api.ts ensures frontend/backend alignment
-export type FoodFightData = GetTournamentResult;
+// Use renamed data type
+export type FoodFightData = GetFoodFightResult;
 
 // Get single Food Fight
 export function useFoodFight(id: string) {
   return useQuery({
     queryKey: ['foodFight', id],
-    queryFn: () => getTournament(id),
-    // Type assertion for data within refetchInterval callback
+    queryFn: () => getFoodFight(id), // Use renamed API function
     refetchInterval: (query: { state: { data: FoodFightData | undefined } }) => {
       const data = query.state.data;
-      // Auto refresh for active tournaments
-      if (data?.tournament?.status === 'voting') {
-        return 5000; // Refresh every 5 seconds during voting
+      // Use renamed inner property from FoodFightData
+      if (data?.foodFight?.status === 'voting') { 
+        return 5000;
       }
       return false;
     },
@@ -54,7 +53,7 @@ export function useCreateFoodFight() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (name: string) => createTournament(name),
+    mutationFn: (name: string) => createFoodFight(name), // Use renamed API function
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['foodFights'] });
       return data;
@@ -67,7 +66,7 @@ export function useCopyFoodFight() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (foodFightId: string) => copyTournament(foodFightId),
+    mutationFn: (foodFightId: string) => copyFoodFight(foodFightId), // Use renamed API function
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['foodFights'] });
       return data;
@@ -75,48 +74,49 @@ export function useCopyFoodFight() {
   });
 }
 
-// Nominate restaurant
+// Nominate restaurant (Hook name unchanged, use renamed API function)
 export function useNominateRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: ({ name, cuisine }: { name: string; cuisine: string }) => 
-      nominateRestaurant(foodFightId, name, cuisine),
+      nominateRestaurant(foodFightId, name, cuisine), // Use renamed API function
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
     },
   });
 }
 
-// Start voting
+// Start voting (Hook name unchanged, use renamed API function)
 export function useStartVoting(foodFightId: string) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: () => startVoting(foodFightId),
+    mutationFn: () => startVoting(foodFightId), // Use renamed API function
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
     },
   });
 }
 
-// New hook for submitting scores - updated for single score submission and optimistic updates
+// Submit scores (Hook name unchanged, use renamed API function)
 export function useSubmitScores(foodFightId: string) {
   const queryClient = useQueryClient();
   const queryKey = ['foodFight', foodFightId];
 
-  return useMutation<void, Error, { restaurant_id: string; score: number }, { previousTournamentData: FoodFightData | undefined }>({ // Add context type
+  return useMutation<void, Error, { restaurant_id: string; score: number }, { previousFoodFightData: FoodFightData | undefined }>({ // Rename context type property
     mutationFn: (scoreData: { restaurant_id: string; score: number }) => 
-      submitScores(foodFightId, scoreData),
+      submitScores(foodFightId, scoreData), // Use renamed API function
 
     onMutate: async (newScoreData) => {
       await queryClient.cancelQueries({ queryKey });
-      const previousTournamentData = queryClient.getQueryData<FoodFightData>(queryKey);
+      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(queryKey);
       queryClient.setQueryData<FoodFightData>(queryKey, (oldData) => {
         if (!oldData) return undefined;
-        const existingScores = oldData.userScores || [];
+        // Use renamed inner property from FoodFightData
+        const existingScores = oldData.userScores || []; 
         const scoreIndex = existingScores.findIndex(s => s.restaurant_id === newScoreData.restaurant_id);
-        let updatedScores: typeof existingScores; // Ensure type consistency
+        let updatedScores: typeof existingScores;
         if (scoreIndex > -1) {
             updatedScores = [
                 ...existingScores.slice(0, scoreIndex),
@@ -131,46 +131,45 @@ export function useSubmitScores(foodFightId: string) {
           userScores: updatedScores,
         };
       });
-      return { previousTournamentData }; // Correct context format
+      return { previousFoodFightData }; // Use renamed context variable
     },
 
     onError: (err, newScoreData, context) => {
       console.error('Score submission failed, rolling back optimistic update:', err);
-      if (context?.previousTournamentData) {
-        queryClient.setQueryData(queryKey, context.previousTournamentData);
+      // Use renamed context property
+      if (context?.previousFoodFightData) {
+        queryClient.setQueryData(queryKey, context.previousFoodFightData);
       }
     },
 
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });
     },
-  }); // Ensure closing brackets/braces are correct
+  });
 }
 
-// Check if voting period has ended and trigger winner calculation if needed
-// Renamed from useCheckRoundEnd for clarity
+// Check Voting End (Hook name unchanged, use renamed API function)
 export function useCheckVotingEnd(foodFightId: string) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (force: boolean = false) => checkRoundEnd(foodFightId, force),
+    mutationFn: (force: boolean = false) => checkRoundEnd(foodFightId, force), // Use renamed API function
     onSuccess: (didEnd) => {
-      // Only refetch if the voting actually ended and winner was calculated
       if (didEnd) {
         console.log('Voting ended/winner calculated, refetching data...');
         queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
-        queryClient.invalidateQueries({ queryKey: ['foodFights'] }); // Also refetch list if status changes
+        queryClient.invalidateQueries({ queryKey: ['foodFights'] });
       }
     },
   });
 }
 
-// Delete restaurant
+// Delete restaurant (Hook name unchanged, use renamed API function)
 export function useDeleteRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: (restaurantId: string) => deleteRestaurant(restaurantId),
+    mutationFn: (restaurantId: string) => deleteRestaurant(restaurantId), // Use renamed API function (no change needed here as it takes restaurantId)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
     },

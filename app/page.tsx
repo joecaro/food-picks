@@ -12,7 +12,7 @@ export default function Home() {
             Food Picks
           </h1>
           <p className="text-xl text-gray-600 mb-8">
-            Tournament-style voting to decide where to eat for lunch
+            Vote on where to eat for lunch!
           </p>
           
           <div className="bg-white p-8 max-w-3xl mx-auto rounded-lg shadow-sm">
@@ -20,37 +20,37 @@ export default function Home() {
             
             <ol className="list-decimal list-inside space-y-4 text-left text-gray-700">
               <li>
-                <span className="font-medium">Create a tournament</span>
+                <span className="font-medium">Start a Food Fight</span>
                 <p className="ml-6 text-gray-600">
-                  Start a new tournament and give it a name like &quot;Friday Lunch&quot; or &quot;Team Dinner&quot;.
+                  Start a new Food Fight and give it a name like &quot;Friday Lunch&quot; or &quot;Team Dinner&quot;.
                 </p>
               </li>
               <li>
                 <span className="font-medium">Nominate restaurants</span>
                 <p className="ml-6 text-gray-600">
-                Add your favorite restaurants to the tournament.
+                Add your favorite restaurants to the Food Fight.
                 </p>
               </li>
               <li>
-                <span className="font-medium">Vote in bracket-style rounds</span>
+                <span className="font-medium">Vote using scores</span>
                 <p className="ml-6 text-gray-600">
-                  Restaurants compete head-to-head in a tournament bracket. Each voting round lasts 2 minutes.
+                  Rate each nominated restaurant on a scale of 1 (🤢) to 5 (🤩) within the voting time window.
                 </p>
               </li>
               <li>
-                <span className="font-medium">Declare a winner</span>
+                <span className="font-medium">See the winner</span>
                 <p className="ml-6 text-gray-600">
-                  The last restaurant standing is where you&apos;ll be having lunch!
+                  The restaurant with the highest average score wins!
                 </p>
               </li>
             </ol>
             
             <div className="mt-8 flex flex-col sm:flex-row sm:justify-center gap-4">
               <Link
-                href="/tournaments"
+                href="/food-fights"
                 className="w-full sm:w-auto bg-blue-600 text-white py-3 px-6 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-center"
               >
-                View Tournaments
+                View Food Fights
               </Link>
               <Link
                 href="/signup"

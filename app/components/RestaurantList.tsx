@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDeleteRestaurant } from '../../lib/hooks/useTournaments';
+import { useDeleteRestaurant } from '@/lib/hooks/useFoodFights';
 import { useAuth } from '@/app/auth-provider';
 
 interface Restaurant {
@@ -12,12 +12,12 @@ interface Restaurant {
 
 interface RestaurantListProps {
   restaurants: Restaurant[];
-  tournamentId: string;
+  foodFightId: string;
 }
 
-export default function RestaurantList({ restaurants, tournamentId }: RestaurantListProps) {
+export default function RestaurantList({ restaurants, foodFightId }: RestaurantListProps) {
   const [error, setError] = useState<string | null>(null);
-  const deleteRestaurantMutation = useDeleteRestaurant(tournamentId);
+  const deleteRestaurantMutation = useDeleteRestaurant(foodFightId);
   const { user } = useAuth();
   const isAdmin = user?.email === 'joe@trysalient.com';
   

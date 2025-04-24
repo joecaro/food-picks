@@ -8,27 +8,26 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export type Database = {
   public: {
     Tables: {
-      tournaments: {
+      food_fights: {
         Row: {
           id: string;
           name: string;
           status: 'nominating' | 'voting' | 'completed';
           creator_id: string;
-          current_round: number;
           end_time: string;
           winner: string | null;
           created_at: string;
         };
         Insert: Omit<
-          Database['public']['Tables']['tournaments']['Row'],
+          Database['public']['Tables']['food_fights']['Row'],
           'id' | 'created_at'
         >;
-        Update: Partial<Database['public']['Tables']['tournaments']['Insert']>;
+        Update: Partial<Database['public']['Tables']['food_fights']['Insert']>;
       };
       restaurants: {
         Row: {
           id: string;
-          tournament_id: string;
+          food_fight_id: string;
           name: string;
           cuisine: string;
           created_at: string;
@@ -39,36 +38,20 @@ export type Database = {
         >;
         Update: Partial<Database['public']['Tables']['restaurants']['Insert']>;
       };
-      matches: {
+      scores: {
         Row: {
           id: string;
-          tournament_id: string;
-          round: number;
-          restaurant1_id: string;
-          restaurant2_id: string | null;
-          votes1: number;
-          votes2: number;
-          created_at: string;
-        };
-        Insert: Omit<
-          Database['public']['Tables']['matches']['Row'],
-          'id' | 'created_at'
-        >;
-        Update: Partial<Database['public']['Tables']['matches']['Insert']>;
-      };
-      votes: {
-        Row: {
-          id: string;
-          match_id: string;
+          food_fight_id: string;
           user_id: string;
           restaurant_id: string;
+          score: number;
           created_at: string;
         };
         Insert: Omit<
-          Database['public']['Tables']['votes']['Row'],
+          Database['public']['Tables']['scores']['Row'],
           'id' | 'created_at'
         >;
-        Update: Partial<Database['public']['Tables']['votes']['Insert']>;
+        Update: Partial<Database['public']['Tables']['scores']['Insert']>;
       };
     };
   };

@@ -1,27 +1,24 @@
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/supabase';
 
-const NOMINATION_TIME = 2 * 60 * 1000; // 2 minutes
-const VOTING_TIME = 2 * 60 * 1000; // 2 minutes per round
+const VOTING_TIME = 15 * 60 * 1000; // 15 minutes
 
 // Tournament functions
-export async function createTournament(name: string) {
+export async function createFoodFight(name: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Convert timestamp to ISO string for PostgreSQL
-  const endTimeDate = new Date(Date.now() + NOMINATION_TIME);
+  const endTimeDate = new Date(Date.now() + VOTING_TIME);
 
   const { data, error } = await supabase
-    .from('tournaments')
+    .from('food_fights')
     .insert({
       name,
       status: 'nominating',
       creator_id: user.id,
-      current_round: 1,
       end_time: endTimeDate.toISOString(),
     })
     .select()
@@ -31,34 +28,33 @@ export async function createTournament(name: string) {
   return data;
 }
 
-export async function copyTournament(tournamentId: string) {
+export async function copyFoodFight(foodFightId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Get original tournament
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
+  // Get original food fight
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
     .select()
-    .eq('id', tournamentId)
+    .eq('id', foodFightId)
     .single();
 
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
 
-  // Create new tournament
-  const endTimeDate = new Date(Date.now() + NOMINATION_TIME);
+  // Create new food fight
+  const newFoodFightEndTimeDate = new Date(Date.now() + VOTING_TIME);
   
-  const { data: newTournament, error: createError } = await supabase
-    .from('tournaments')
+  const { data: newFoodFight, error: createError } = await supabase
+    .from('food_fights')
     .insert({
-      name: tournament.name + ' (Copy)',
+      name: foodFight.name + ' (Copy)',
       status: 'nominating',
       creator_id: user.id,
-      current_round: 1,
-      end_time: endTimeDate.toISOString(),
+      end_time: newFoodFightEndTimeDate.toISOString(),
     })
     .select()
     .single();
@@ -69,13 +65,13 @@ export async function copyTournament(tournamentId: string) {
   const { data: restaurants, error: restaurantsError } = await supabase
     .from('restaurants')
     .select()
-    .eq('tournament_id', tournamentId);
+    .eq('food_fight_id', foodFightId);
 
   if (restaurantsError) throw restaurantsError;
 
   if (restaurants && restaurants.length > 0) {
     const restaurantsCopy = restaurants.map((restaurant: Database['public']['Tables']['restaurants']['Row']) => ({
-      tournament_id: newTournament.id,
+      food_fight_id: newFoodFight.id,
       name: restaurant.name,
       cuisine: restaurant.cuisine,
     }));
@@ -87,32 +83,43 @@ export async function copyTournament(tournamentId: string) {
     if (copyError) throw copyError;
   }
 
-  return newTournament;
+  // Update food fight status
+  const { error: updateError } = await supabase
+    .from('food_fights')
+    .update({
+      status: 'voting',
+      end_time: newFoodFightEndTimeDate.toISOString(),
+    })
+    .eq('id', newFoodFight.id);
+
+  if (updateError) throw updateError;
+
+  return newFoodFight;
 }
 
-export async function nominateRestaurant(tournamentId: string, name: string, cuisine: string) {
+export async function nominateRestaurant(foodFightId: string, name: string, cuisine: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Check tournament status
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
+  // Check food fight status
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
     .select()
-    .eq('id', tournamentId)
+    .eq('id', foodFightId)
     .single();
 
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'nominating') throw new Error('Tournament not in nomination phase');
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
+  if (foodFight.status !== 'nominating') throw new Error('Food Fight not in nomination phase');
 
   // Add restaurant
   const { error } = await supabase
     .from('restaurants')
     .insert({
-      tournament_id: tournamentId,
+      food_fight_id: foodFightId,
       name,
       cuisine,
     });
@@ -120,269 +127,75 @@ export async function nominateRestaurant(tournamentId: string, name: string, cui
   if (error) throw error;
 }
 
-export async function startVoting(tournamentId: string) {
+export async function startVoting(foodFightId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Check tournament status
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
+  // Check food fight status
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
     .select()
-    .eq('id', tournamentId)
+    .eq('id', foodFightId)
     .single();
 
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'nominating') throw new Error('Tournament not in nomination phase');
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
+  if (foodFight.status !== 'nominating') throw new Error('Food Fight not in nomination phase');
 
   // Get restaurants
   const { data: restaurants, error: restaurantsError } = await supabase
     .from('restaurants')
     .select()
-    .eq('tournament_id', tournamentId);
+    .eq('food_fight_id', foodFightId);
 
   if (restaurantsError) throw restaurantsError;
   if (!restaurants || restaurants.length < 2) throw new Error('Need at least 2 restaurants');
 
-  // Shuffle restaurants
-  const shuffled = [...restaurants];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  // Create matches for first round
-  const matches = [];
-  for (let i = 0; i < shuffled.length; i += 2) {
-    const restaurant1 = shuffled[i];
-    const restaurant2 = shuffled[i + 1];
-    matches.push({
-      tournament_id: tournamentId,
-      round: 1,
-      restaurant1: restaurant1.id,
-      restaurant2: restaurant2?.id || null,
-      votes1: 0,
-      votes2: 0,
-    });
-  }
-
-  // Insert matches
-  const { error: matchesError } = await supabase
-    .from('matches')
-    .insert(matches);
-
-  if (matchesError) throw matchesError;
-
-  // Update tournament status
+  // Update food fight status
   const endTimeDate = new Date(Date.now() + VOTING_TIME);
   
   const { error: updateError } = await supabase
-    .from('tournaments')
+    .from('food_fights')
     .update({
       status: 'voting',
-      current_round: 1,
       end_time: endTimeDate.toISOString(),
     })
-    .eq('id', tournamentId);
+    .eq('id', foodFightId);
 
   if (updateError) throw updateError;
 }
 
-export async function vote(matchId: string, restaurantId: string) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function checkRoundEnd(foodFightId: string, force = false) {
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
+    .select('status, end_time')
+    .eq('id', foodFightId)
+    .single();
+
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
   
-  if (!user) throw new Error('Not logged in');
+  if (foodFight.status !== 'voting') return false; 
 
-  // Get match details
-  const { data: match, error: matchError } = await supabase
-    .from('matches')
-    .select()
-    .eq('id', matchId)
-    .single();
-
-  if (matchError) throw matchError;
-  if (!match) throw new Error('Match not found');
-
-  // Check tournament status
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
-    .select()
-    .eq('id', match.tournament_id)
-    .single();
-
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'voting') throw new Error('Tournament not in voting phase');
-  if (tournament.current_round !== match.round) throw new Error('Match not in current round');
-
-  // Check if user already voted
-  const { data: existingVote, error: voteError } = await supabase
-    .from('votes')
-    .select()
-    .eq('match_id', matchId)
-    .eq('user_id', user.id)
-    .maybeSingle();
-
-  if (voteError) throw voteError;
-  if (existingVote) throw new Error('Already voted');
-
-  try {
-    // Record vote - start a transaction by using .rpc() for atomic operations
-    const { error: insertError } = await supabase
-      .from('votes')
-      .insert({
-        match_id: matchId,
-        user_id: user.id,
-        restaurant_id: restaurantId,
-      });
-
-    if (insertError) throw insertError;
-
-    // Update match vote count
-    if (restaurantId === match.restaurant1) {
-      const { error: updateError } = await supabase
-        .from('matches')
-        .update({ votes1: match.votes1 + 1 })
-        .eq('id', matchId);
-      
-      if (updateError) throw updateError;
-    } else if (restaurantId === match.restaurant2) {
-      const { error: updateError } = await supabase
-        .from('matches')
-        .update({ votes2: match.votes2 + 1 })
-        .eq('id', matchId);
-      
-      if (updateError) throw updateError;
-    }
-  } catch (error) {
-    console.error("Error processing vote:", error);
-    throw new Error("Failed to process vote. Please try again.");
-  }
-}
-
-export async function checkRoundEnd(tournamentId: string, force = false) {
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
-    .select()
-    .eq('id', tournamentId)
-    .single();
-
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  
-  if (tournament.status !== 'voting') return false;
-
-  const endTime = new Date(tournament.end_time).getTime();
+  const endTime = new Date(foodFight.end_time).getTime();
   const now = Date.now();
   
   if (force || endTime <= now) {
-    console.log('Advancing round...');
-    await advanceRound(tournamentId);
+    console.log('Voting time ended, calculating winner...');
+    await calculateWinner(foodFightId); 
     return true;
   }
   
   return false;
 }
 
-export async function advanceRound(tournamentId: string) {
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
-    .select()
-    .eq('id', tournamentId)
-    .single();
-
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'voting') throw new Error('Tournament not in voting phase');
-
-  const { data: matches, error: matchesError } = await supabase
-    .from('matches')
-    .select()
-    .eq('tournament_id', tournamentId)
-    .eq('round', tournament.current_round);
-
-  if (matchesError) throw matchesError;
-  if (!matches) throw new Error('No matches found');
-
-  console.log(`Advancing round ${tournament.current_round}, found ${matches.length} matches`);
-  
-  const winners: string[] = [];
-  for (const match of matches) {
-    if (!match.restaurant2) {
-      console.log(`Match ${match.id}: Restaurant1 (${match.restaurant1}) wins by bye`);
-      winners.push(match.restaurant1);
-    } else if (match.votes1 >= match.votes2) {
-      console.log(`Match ${match.id}: Restaurant1 (${match.restaurant1}) wins with ${match.votes1} votes vs ${match.votes2} votes`);
-      winners.push(match.restaurant1);
-    } else {
-      console.log(`Match ${match.id}: Restaurant2 (${match.restaurant2}) wins with ${match.votes2} votes vs ${match.votes1} votes`);
-      winners.push(match.restaurant2);
-    }
-  }
-
-  console.log(`Winners: ${winners.length}, winners array:`, winners);
-  
-  if (winners.length === 1) {
-    console.log('Only one winner, setting tournament to completed');
-    const { error: updateError } = await supabase
-      .from('tournaments')
-      .update({
-        status: 'completed',
-        winner: winners[0],
-      })
-      .eq('id', tournamentId);
-
-    if (updateError) throw updateError;
-  } else {
-    // Create next round matches
-    const nextRoundMatches = [];
-    for (let i = 0; i < winners.length; i += 2) {
-      const restaurant1 = winners[i];
-      const restaurant2 = i + 1 < winners.length ? winners[i + 1] : null;
-      console.log(`Creating match for round ${tournament.current_round + 1}: ${restaurant1} vs ${restaurant2 || 'bye'}`);
-      
-      nextRoundMatches.push({
-        tournament_id: tournamentId,
-        round: tournament.current_round + 1,
-        restaurant1: restaurant1,
-        restaurant2: restaurant2,
-        votes1: 0,
-        votes2: 0,
-      });
-    }
-
-    console.log(`Creating ${nextRoundMatches.length} matches for round ${tournament.current_round + 1}`);
-    
-    const { error: insertError } = await supabase
-      .from('matches')
-      .insert(nextRoundMatches);
-
-    if (insertError) throw insertError;
-
-    // Update tournament status
-    const endTimeDate = new Date(Date.now() + VOTING_TIME);
-    
-    const { error: updateError } = await supabase
-      .from('tournaments')
-      .update({
-        current_round: tournament.current_round + 1,
-        end_time: endTimeDate.toISOString(),
-      })
-      .eq('id', tournamentId);
-
-    if (updateError) throw updateError;
-  }
-}
-
-export async function listTournaments() {
+export async function listFoodFights() {
   try {
     const { data, error } = await supabase
-      .from('tournaments')
+      .from('food_fights')
       .select(`
         *,
         winner:winner(id, name, cuisine)
@@ -392,120 +205,148 @@ export async function listTournaments() {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('Error listing tournaments:', error);
+    console.error('Error listing Food Fights:', error);
     return [];
   }
 }
 
-export async function getTournament(tournamentId: string) {
+// Define types for scores to be returned by getFoodFight
+type UserScore = {
+  restaurant_id: string;
+  score: number;
+}
+
+type AggregateScore = {
+  restaurant_id: string;
+  name: string; // Include restaurant name
+  cuisine: string; // Include restaurant cuisine
+  average_score: number;
+  vote_count: number;
+}
+
+// Define and export the structure for the result of getFoodFight
+export type GetFoodFightResult = {
+  foodFight: { // Renamed property
+    id: string;
+    name: string;
+    status: string;
+    end_time: string;
+    creator_id: string;
+    created_at: string;
+    winner: string | null; // Winner restaurant ID
+  };
+  restaurants: { id: string; name: string; cuisine: string }[];
+  winnerDetails: { id: string; name: string; cuisine: string } | null; // Full details if winner exists
+  userScores: UserScore[];
+  aggregateScores: AggregateScore[];
+};
+
+export async function getFoodFight(foodFightId: string): Promise<GetFoodFightResult> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Get tournament details
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
+  // Get food fight details
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
     .select(`
-      *,
-      winner:winner(id, name, cuisine)
+      id, name, status, end_time, creator_id, created_at,
+      winner 
     `)
-    .eq('id', tournamentId)
+    .eq('id', foodFightId)
     .single();
 
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
 
   // Get restaurants
   const { data: restaurants, error: restaurantsError } = await supabase
     .from('restaurants')
-    .select()
-    .eq('tournament_id', tournamentId);
+    .select('id, name, cuisine')
+    .eq('food_fight_id', foodFightId);
 
   if (restaurantsError) throw restaurantsError;
+  
+  const restaurantList = restaurants || [];
 
-  if (tournament.status === 'nominating') {
-    return {
-      tournament,
-      restaurants: restaurants || [],
-      winner: tournament.winner,
-    };
+  // Find winner details from the restaurant list if winner ID exists
+  const winnerDetails = foodFight.winner 
+    ? restaurantList.find(r => r.id === foodFight.winner) || null
+    : null;
+
+  // Initialize scores
+  let userScoresResult: UserScore[] = [];
+  let aggregateScoresResult: AggregateScore[] = [];
+
+  // If voting or completed, fetch scores
+  if (foodFight.status === 'voting' || foodFight.status === 'completed') {
+    // Get user's scores
+    const { data: userScoresData, error: userScoresError } = await supabase
+      .from('scores')
+      .select('restaurant_id, score')
+      .eq('food_fight_id', foodFightId)
+      .eq('user_id', user.id);
+
+    if (userScoresError) throw userScoresError;
+    userScoresResult = userScoresData || [];
+
+    // If completed, calculate and add aggregate scores for display
+    if (foodFight.status === 'completed') {
+      const { data: allScoresData, error: allScoresError } = await supabase
+        .from('scores')
+        .select('restaurant_id, score')
+        .eq('food_fight_id', foodFightId);
+
+      if (allScoresError) throw allScoresError;
+      
+      if (allScoresData && allScoresData.length > 0) {
+          const restaurantScores: Record<string, { totalScore: number; voteCount: number }> = {};
+          allScoresData.forEach(s => {
+            if (!restaurantScores[s.restaurant_id]) {
+              restaurantScores[s.restaurant_id] = { totalScore: 0, voteCount: 0 };
+            }
+            restaurantScores[s.restaurant_id].totalScore += s.score;
+            restaurantScores[s.restaurant_id].voteCount++;
+          });
+          
+          // Map restaurant details into the aggregate scores
+          const restaurantMap = new Map(restaurantList.map(r => [r.id, r]));
+
+          aggregateScoresResult = Object.entries(restaurantScores).map(([id, data]) => {
+            const restaurantDetails = restaurantMap.get(id);
+            return {
+                restaurant_id: id,
+                name: restaurantDetails?.name || 'Unknown Restaurant', 
+                cuisine: restaurantDetails?.cuisine || 'Unknown',
+                average_score: data.totalScore / data.voteCount,
+                vote_count: data.voteCount
+            }
+          });
+          
+          // Sort by average score descending
+          aggregateScoresResult.sort((a, b) => b.average_score - a.average_score);
+          
+          // Assign calculated aggregate scores
+          aggregateScoresResult = aggregateScoresResult;
+      }
+    } else {
+      // Status is 'voting'
+      aggregateScoresResult = [];
+    }
+  } else {
+    // Status is 'nominating'
+    aggregateScoresResult = [];
   }
 
-  // Get matches and process for bracket display
-  const { data: matches, error: matchesError } = await supabase
-    .from('matches')
-    .select(`
-      *,
-      restaurant1(*),
-      restaurant2(*)
-    `)
-    .eq('tournament_id', tournamentId);
-
-  if (matchesError) throw matchesError;
-
-  // Get user votes
-  const { data: votes, error: votesError } = await supabase
-    .from('votes')
-    .select()
-    .eq('user_id', user.id)
-    .in(
-      'match_id',
-      matches?.map((match: { id: string }) => match.id) || []
-    );
-
-  if (votesError) throw votesError;
-
-  // Group matches by round
-  type Restaurant = {
-    id: string;
-    name: string;
-    cuisine: string;
-  };
-  
-  type Match = {
-    id: string;
-    round: number;
-    restaurant1: Restaurant;
-    restaurant2: Restaurant | null;
-    votes1: number;
-    votes2: number;
-    userVote?: string;
-  };
-  
-  const matchesByRound: Record<number, Match[]> = {};
-
-  matches?.forEach((match: { 
-    id: string; 
-    round: number; 
-    restaurant1: Restaurant; 
-    restaurant2: Restaurant | null;
-    votes1: number;
-    votes2: number;
-  }) => {
-    if (!matchesByRound[match.round]) {
-      matchesByRound[match.round] = [];
-    }
-    
-    const userVote = votes?.find((vote: { match_id: string; restaurant_id: string }) => vote.match_id === match.id)?.restaurant_id;
-    
-    matchesByRound[match.round].push({
-      id: match.id,
-      round: match.round,
-      restaurant1: match.restaurant1,
-      restaurant2: match.restaurant2,
-      votes1: match.votes1,
-      votes2: match.votes2,
-      userVote,
-    });
-  });
-
+  // Construct the final result object
   return {
-    tournament,
-    restaurants: restaurants || [],
-    winner: tournament.winner,
-    matchesByRound,
+    foodFight,
+    restaurants: restaurantList,
+    winnerDetails,
+    userScores: userScoresResult,
+    aggregateScores: aggregateScoresResult,
   };
 }
 
@@ -537,26 +378,26 @@ export async function deleteRestaurant(restaurantId: string) {
   
   if (!user) throw new Error('Not logged in');
 
-  // Get restaurant to check tournament status
+  // Get restaurant to find food fight id
   const { data: restaurant, error: restaurantError } = await supabase
     .from('restaurants')
-    .select('tournament_id')
+    .select('food_fight_id')
     .eq('id', restaurantId)
     .single();
 
   if (restaurantError) throw restaurantError;
   if (!restaurant) throw new Error('Restaurant not found');
 
-  // Check tournament status
-  const { data: tournament, error: tournamentError } = await supabase
-    .from('tournaments')
+  // Check food fight status
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
     .select()
-    .eq('id', restaurant.tournament_id)
+    .eq('id', restaurant.food_fight_id)
     .single();
 
-  if (tournamentError) throw tournamentError;
-  if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'nominating') throw new Error('Cannot remove restaurant after nomination phase');
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
+  if (foodFight.status !== 'nominating') throw new Error('Cannot remove restaurant after nomination phase');
 
   // Delete restaurant
   const { error } = await supabase
@@ -565,4 +406,135 @@ export async function deleteRestaurant(restaurantId: string) {
     .eq('id', restaurantId);
 
   if (error) throw error;
+}
+
+// New function to submit scores for a user - Updated to accept single score object
+export async function submitScores(foodFightId: string, scoreData: { restaurant_id: string; score: number }) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('Not logged in');
+
+  // Check food fight status
+  const { data: foodFight, error: foodFightError } = await supabase
+    .from('food_fights')
+    .select('status, end_time')
+    .eq('id', foodFightId)
+    .single();
+
+  if (foodFightError) throw foodFightError;
+  if (!foodFight) throw new Error('Food Fight not found');
+  if (foodFight.status !== 'voting') throw new Error('Food Fight not in voting phase');
+  
+  // Optional: Check if voting time has ended
+  // const endTime = new Date(foodFight.end_time).getTime();
+  // if (Date.now() > endTime) {
+  //   throw new Error('Voting has ended for this Food Fight');
+  // }
+
+  // Validate the single score object
+  if (!scoreData || typeof scoreData.restaurant_id !== 'string' || 
+      typeof scoreData.score !== 'number' || 
+      scoreData.score < 1 || scoreData.score > 5 ||
+      !Number.isInteger(scoreData.score)) {
+    throw new Error('Invalid score format or value (must be integer 1-5)');
+  }
+  
+  // Prepare single row for upsert
+  const scoreRow = {
+    food_fight_id: foodFightId,
+    user_id: user.id,
+    restaurant_id: scoreData.restaurant_id,
+    score: scoreData.score,
+  };
+
+  // Upsert single score (insert or update based on unique constraint)
+  const { error: upsertError } = await supabase
+    .from('scores')
+    .upsert(scoreRow, { onConflict: 'food_fight_id, user_id, restaurant_id' }); // Pass single object
+
+  if (upsertError) {
+    console.error("Error submitting score:", upsertError);
+    throw new Error("Failed to submit score.");
+  }
+}
+
+// New function to calculate and set the winner based on scores
+export async function calculateWinner(foodFightId: string) {
+  console.log(`Calculating winner for Food Fight ${foodFightId}`);
+  
+  // 1. Verify food fight status (should be 'voting' or maybe re-runnable if 'completed')
+  const { data: foodFightData, error: foodFightError } = await supabase
+    .from('food_fights')
+    .select('status')
+    .eq('id', foodFightId)
+    .single();
+
+  if (foodFightError) throw foodFightError;
+  if (!foodFightData) throw new Error('Food Fight not found during winner calculation');
+  if (foodFightData.status !== 'voting') {
+     console.warn(`Food Fight ${foodFightId} is not in 'voting' status. Current status: ${foodFightData.status}. Calculation might be redundant or inappropriate.`);
+     // Decide if we should proceed or exit. For now, let's proceed but warn.
+     // return; 
+  }
+  
+  // 2. Fetch all scores for the food fight
+  const { data: scores, error: scoresError } = await supabase
+    .from('scores')
+    .select('restaurant_id, score')
+    .eq('food_fight_id', foodFightId);
+
+  if (scoresError) throw scoresError;
+  if (!scores || scores.length === 0) {
+    // Handle case with no scores - maybe set status to completed with no winner?
+    console.warn(`No scores found for Food Fight ${foodFightId}. Cannot determine winner.`);
+     const { error: updateError } = await supabase
+      .from('food_fights')
+      .update({ status: 'completed', winner: null }) // Set winner to null explicitly
+      .eq('id', foodFightId);
+    if (updateError) throw updateError;
+    return; // Exit early
+  }
+
+  // 3. Calculate aggregate scores (average score per restaurant)
+  const restaurantScores: Record<string, { totalScore: number; voteCount: number }> = {};
+  scores.forEach(s => {
+    if (!restaurantScores[s.restaurant_id]) {
+      restaurantScores[s.restaurant_id] = { totalScore: 0, voteCount: 0 };
+    }
+    restaurantScores[s.restaurant_id].totalScore += s.score;
+    restaurantScores[s.restaurant_id].voteCount++;
+  });
+  
+  const restaurantAverages = Object.entries(restaurantScores).map(([id, data]) => ({
+    id,
+    averageScore: data.totalScore / data.voteCount,
+    voteCount: data.voteCount // Keep vote count for tie-breaking?
+  }));
+
+  // 4. Find the winner (highest average score)
+  // Sort descending by average score, then potentially by vote count as a tie-breaker
+  restaurantAverages.sort((a, b) => {
+      if (b.averageScore !== a.averageScore) {
+          return b.averageScore - a.averageScore;
+      }
+      // Tie-breaker: higher vote count wins (optional)
+      // return b.voteCount - a.voteCount; 
+      // Or just pick the first one found in case of a tie
+      return 0; 
+  });
+  
+  const winnerId = restaurantAverages[0].id;
+  console.log(`Winner determined for ${foodFightId}: Restaurant ${winnerId} with average score ${restaurantAverages[0].averageScore}`);
+
+  // 5. Update food fight status and winner
+  const { error: updateError } = await supabase
+    .from('food_fights')
+    .update({ status: 'completed', winner: winnerId })
+    .eq('id', foodFightId);
+
+  if (updateError) throw updateError;
+
+  console.log(`Food Fight ${foodFightId} status updated to completed.`);
 } 

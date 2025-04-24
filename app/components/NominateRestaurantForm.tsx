@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import RestaurantSearchSelect from './RestaurantSearchSelect';
-import { useNominateRestaurant } from '../../lib/hooks/useTournaments';
+import { useNominateRestaurant } from '../../lib/hooks/useFoodFights';
 
 const restaurantSchema = z.object({
   name: z.string().min(2, { message: 'Restaurant name must be at least 2 characters' }),
@@ -15,14 +15,14 @@ const restaurantSchema = z.object({
 type RestaurantFormValues = z.infer<typeof restaurantSchema>;
 
 interface NominateRestaurantFormProps {
-  tournamentId: string;
+  foodFightId: string;
 }
 
 export default function NominateRestaurantForm({ 
-  tournamentId
+  foodFightId
 }: NominateRestaurantFormProps) {
   const [error, setError] = useState<string | null>(null);
-  const nominateMutation = useNominateRestaurant(tournamentId);
+  const nominateMutation = useNominateRestaurant(foodFightId);
   
   const {
     register,
