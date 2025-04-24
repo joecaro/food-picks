@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { vote, checkRoundEnd } from '../../lib/api';
+import { useVote, useCheckRoundEnd } from '../../lib/hooks/useTournaments';
+import { useAuth } from '@/app/auth-provider';
 
 interface Restaurant {
   id: string;
@@ -24,7 +25,6 @@ interface TournamentBracketProps {
   currentRound: number;
   matchesByRound: Record<number, Match[]>;
   endTime: string; // ISO string date
-  onRefresh: () => void;
 }
 
 export default function TournamentBracket({
@@ -32,50 +32,47 @@ export default function TournamentBracket({
   currentRound,
   matchesByRound,
   endTime,
-  onRefresh,
 }: TournamentBracketProps) {
-  const [isVoting, setIsVoting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(
     Math.max(0, new Date(endTime).getTime() - Date.now())
   );
+  const { user } = useAuth();
+  const isAdmin = user?.email === 'joe@trysalient.com';
 
-  // Set up countdown timer
+  const voteMutation = useVote(tournamentId);
+  const checkRoundEndMutation = useCheckRoundEnd(tournamentId);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const newTimeLeft = Math.max(0, new Date(endTime).getTime() - Date.now());
       setTimeLeft(newTimeLeft);
-      
-      if (newTimeLeft === 0) {
-        clearInterval(interval);
-        // Check if round has ended
-        checkRoundEnd(tournamentId)
-          .then(() => {
-            onRefresh();
-          })
-          .catch(console.error);
-      }
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [endTime, tournamentId, onRefresh]);
+  }, [endTime]);
 
-  const handleVote = async (matchId: string, restaurantId: string) => {
-    setIsVoting(matchId);
-    setError(null);
-    
+  const handleAdvanceRound = async () => {
+    console.log('Manually advancing round...');
     try {
-      await vote(matchId, restaurantId);
-      onRefresh();
+      await checkRoundEndMutation.mutateAsync(true);
     } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to submit vote');
-    } finally {
-      setIsVoting(null);
+      console.error('Failed to advance round:', err);
+      setError('Failed to advance to next round. Please refresh.');
     }
   };
 
-  // Format time left
+  const handleVote = async (matchId: string, restaurantId: string) => {
+    setError(null);
+    
+    try {
+      await voteMutation.mutateAsync({ matchId, restaurantId });
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to submit vote');
+    }
+  };
+
   const formatTimeLeft = () => {
     const minutes = Math.floor(timeLeft / 60000);
     const seconds = Math.floor((timeLeft % 60000) / 1000);
@@ -93,8 +90,19 @@ export default function TournamentBracket({
       <div className="bg-white p-4 rounded-lg shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-medium">Round {currentRound}</h2>
-          <div className="text-sm text-gray-500">
-            Time left: <span className="font-mono">{formatTimeLeft()}</span>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500">
+              Time left: <span className="font-mono">{formatTimeLeft()}</span>
+            </div>
+            
+            {isAdmin && (
+              <button
+                onClick={handleAdvanceRound}
+                className="bg-purple-600 text-white py-1 px-3 rounded-md hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 text-sm"
+              >
+                Advance Round
+              </button>
+            )}
           </div>
         </div>
         
@@ -120,10 +128,10 @@ export default function TournamentBracket({
                   {!match.userVote && (
                     <button
                       onClick={() => handleVote(match.id, match.restaurant1.id)}
-                      disabled={isVoting !== null}
+                      disabled={voteMutation.isPending}
                       className="mt-3 bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 text-sm"
                     >
-                      {isVoting === match.id ? 'Voting...' : 'Vote'}
+                      {voteMutation.isPending && voteMutation.variables?.matchId === match.id ? 'Voting...' : 'Vote'}
                     </button>
                   )}
                 </div>
@@ -147,10 +155,10 @@ export default function TournamentBracket({
                             handleVote(match.id, match.restaurant2.id);
                           }
                         }}
-                        disabled={isVoting !== null}
+                        disabled={voteMutation.isPending}
                         className="mt-3 bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 text-sm"
                       >
-                        {isVoting === match.id ? 'Voting...' : 'Vote'}
+                        {voteMutation.isPending && voteMutation.variables?.matchId === match.id ? 'Voting...' : 'Vote'}
                       </button>
                     )}
                   </div>
@@ -220,7 +228,7 @@ export default function TournamentBracket({
                       </div>
                     )}
                     {!match.restaurant2 && (
-                      <div className="flex-1 p-4 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
+                      <div className="flex-1 p-4 rounded-lg border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
                         <span className="text-gray-400">Bye (no opponent)</span>
                       </div>
                     )}

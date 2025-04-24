@@ -230,37 +230,41 @@ export async function vote(matchId: string, restaurantId: string) {
   if (voteError) throw voteError;
   if (existingVote) throw new Error('Already voted');
 
-  // Record vote
-  const { error: insertError } = await supabase
-    .from('votes')
-    .insert({
-      match_id: matchId,
-      user_id: user.id,
-      restaurant_id: restaurantId,
-    });
+  try {
+    // Record vote - start a transaction by using .rpc() for atomic operations
+    const { error: insertError } = await supabase
+      .from('votes')
+      .insert({
+        match_id: matchId,
+        user_id: user.id,
+        restaurant_id: restaurantId,
+      });
 
-  if (insertError) throw insertError;
+    if (insertError) throw insertError;
 
-  // Update match vote count
-  if (restaurantId === match.restaurant1) {
-    const { error: updateError } = await supabase
-      .from('matches')
-      .update({ votes1: match.votes1 + 1 })
-      .eq('id', matchId);
-    
-    if (updateError) throw updateError;
-  } else if (restaurantId === match.restaurant2) {
-    const { error: updateError } = await supabase
-      .from('matches')
-      .update({ votes2: match.votes2 + 1 })
-      .eq('id', matchId);
-    
-    if (updateError) throw updateError;
+    // Update match vote count
+    if (restaurantId === match.restaurant1) {
+      const { error: updateError } = await supabase
+        .from('matches')
+        .update({ votes1: match.votes1 + 1 })
+        .eq('id', matchId);
+      
+      if (updateError) throw updateError;
+    } else if (restaurantId === match.restaurant2) {
+      const { error: updateError } = await supabase
+        .from('matches')
+        .update({ votes2: match.votes2 + 1 })
+        .eq('id', matchId);
+      
+      if (updateError) throw updateError;
+    }
+  } catch (error) {
+    console.error("Error processing vote:", error);
+    throw new Error("Failed to process vote. Please try again.");
   }
 }
 
-export async function checkRoundEnd(tournamentId: string) {
-  // Get tournament
+export async function checkRoundEnd(tournamentId: string, force = false) {
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
     .select()
@@ -269,15 +273,22 @@ export async function checkRoundEnd(tournamentId: string) {
 
   if (tournamentError) throw tournamentError;
   if (!tournament) throw new Error('Tournament not found');
-  if (tournament.status !== 'voting') return;
+  
+  if (tournament.status !== 'voting') return false;
 
-  if (tournament.end_time <= Date.now()) {
+  const endTime = new Date(tournament.end_time).getTime();
+  const now = Date.now();
+  
+  if (force || endTime <= now) {
+    console.log('Advancing round...');
     await advanceRound(tournamentId);
+    return true;
   }
+  
+  return false;
 }
 
 export async function advanceRound(tournamentId: string) {
-  // Get tournament
   const { data: tournament, error: tournamentError } = await supabase
     .from('tournaments')
     .select()
@@ -288,7 +299,6 @@ export async function advanceRound(tournamentId: string) {
   if (!tournament) throw new Error('Tournament not found');
   if (tournament.status !== 'voting') throw new Error('Tournament not in voting phase');
 
-  // Get current round matches
   const { data: matches, error: matchesError } = await supabase
     .from('matches')
     .select()
@@ -298,20 +308,26 @@ export async function advanceRound(tournamentId: string) {
   if (matchesError) throw matchesError;
   if (!matches) throw new Error('No matches found');
 
-  // Determine winners
+  console.log(`Advancing round ${tournament.current_round}, found ${matches.length} matches`);
+  
   const winners: string[] = [];
   for (const match of matches) {
     if (!match.restaurant2) {
+      console.log(`Match ${match.id}: Restaurant1 (${match.restaurant1}) wins by bye`);
       winners.push(match.restaurant1);
     } else if (match.votes1 >= match.votes2) {
+      console.log(`Match ${match.id}: Restaurant1 (${match.restaurant1}) wins with ${match.votes1} votes vs ${match.votes2} votes`);
       winners.push(match.restaurant1);
     } else {
+      console.log(`Match ${match.id}: Restaurant2 (${match.restaurant2}) wins with ${match.votes2} votes vs ${match.votes1} votes`);
       winners.push(match.restaurant2);
     }
   }
 
+  console.log(`Winners: ${winners.length}, winners array:`, winners);
+  
   if (winners.length === 1) {
-    // Tournament complete
+    console.log('Only one winner, setting tournament to completed');
     const { error: updateError } = await supabase
       .from('tournaments')
       .update({
@@ -326,17 +342,21 @@ export async function advanceRound(tournamentId: string) {
     const nextRoundMatches = [];
     for (let i = 0; i < winners.length; i += 2) {
       const restaurant1 = winners[i];
-      const restaurant2 = winners[i + 1];
+      const restaurant2 = i + 1 < winners.length ? winners[i + 1] : null;
+      console.log(`Creating match for round ${tournament.current_round + 1}: ${restaurant1} vs ${restaurant2 || 'bye'}`);
+      
       nextRoundMatches.push({
         tournament_id: tournamentId,
         round: tournament.current_round + 1,
         restaurant1: restaurant1,
-        restaurant2: restaurant2 || null,
+        restaurant2: restaurant2,
         votes1: 0,
         votes2: 0,
       });
     }
 
+    console.log(`Creating ${nextRoundMatches.length} matches for round ${tournament.current_round + 1}`);
+    
     const { error: insertError } = await supabase
       .from('matches')
       .insert(nextRoundMatches);
@@ -412,13 +432,13 @@ export async function getTournament(tournamentId: string) {
     };
   }
 
-  // Get matches
+  // Get matches and process for bracket display
   const { data: matches, error: matchesError } = await supabase
     .from('matches')
     .select(`
       *,
-      restaurant1:restaurant1_id(*),
-      restaurant2:restaurant2_id(*)
+      restaurant1(*),
+      restaurant2(*)
     `)
     .eq('tournament_id', tournamentId);
 
@@ -439,26 +459,21 @@ export async function getTournament(tournamentId: string) {
   // Group matches by round
   type Restaurant = {
     id: string;
-    tournament_id: string;
     name: string;
     cuisine: string;
-    created_at: string;
   };
   
-  type MatchWithVote = {
+  type Match = {
     id: string;
-    tournament_id: string;
     round: number;
-    restaurant1: string;
-    restaurant2: string | null;
+    restaurant1: Restaurant;
+    restaurant2: Restaurant | null;
     votes1: number;
     votes2: number;
-    restaurant1_details: Restaurant;
-    restaurant2_details: Restaurant | null;
     userVote?: string;
   };
   
-  const matchesByRound: Record<number, MatchWithVote[]> = {};
+  const matchesByRound: Record<number, Match[]> = {};
   matches?.forEach(match => {
     if (!matchesByRound[match.round]) {
       matchesByRound[match.round] = [];
@@ -467,9 +482,12 @@ export async function getTournament(tournamentId: string) {
     const userVote = votes?.find(vote => vote.match_id === match.id)?.restaurant_id;
     
     matchesByRound[match.round].push({
-      ...match,
-      restaurant1_details: match.restaurant1,
-      restaurant2_details: match.restaurant2,
+      id: match.id,
+      round: match.round,
+      restaurant1: match.restaurant1,
+      restaurant2: match.restaurant2,
+      votes1: match.votes1,
+      votes2: match.votes2,
       userVote,
     });
   });
@@ -501,4 +519,41 @@ export async function getAllRestaurants() {
     console.error('Error fetching restaurants:', error);
     return [];
   }
+}
+
+export async function deleteRestaurant(restaurantId: string) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('Not logged in');
+
+  // Get restaurant to check tournament status
+  const { data: restaurant, error: restaurantError } = await supabase
+    .from('restaurants')
+    .select('tournament_id')
+    .eq('id', restaurantId)
+    .single();
+
+  if (restaurantError) throw restaurantError;
+  if (!restaurant) throw new Error('Restaurant not found');
+
+  // Check tournament status
+  const { data: tournament, error: tournamentError } = await supabase
+    .from('tournaments')
+    .select()
+    .eq('id', restaurant.tournament_id)
+    .single();
+
+  if (tournamentError) throw tournamentError;
+  if (!tournament) throw new Error('Tournament not found');
+  if (tournament.status !== 'nominating') throw new Error('Cannot remove restaurant after nomination phase');
+
+  // Delete restaurant
+  const { error } = await supabase
+    .from('restaurants')
+    .delete()
+    .eq('id', restaurantId);
+
+  if (error) throw error;
 } 

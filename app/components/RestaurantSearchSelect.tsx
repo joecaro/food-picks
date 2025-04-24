@@ -94,10 +94,9 @@ export default function RestaurantSearchSelect({ onSelect }: RestaurantSearchSel
   }, [searchTerm]);
 
   const handleSelect = (restaurant: Restaurant) => {
+    setIsOpen(false);
     onSelect(restaurant);
     setSearchTerm('');
-    setIsOpen(false);
-    inputRef.current?.focus();
   };
 
   return (

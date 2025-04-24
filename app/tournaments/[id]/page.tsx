@@ -1,87 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import * as React from 'react';
 import Navbar from '../../components/Navbar';
 import NominateRestaurantForm from '../../components/NominateRestaurantForm';
 import RestaurantList from '../../components/RestaurantList';
 import TournamentBracket from '../../components/TournamentBracket';
-import TournamentWinner from '../../components/TournamentWinner';
+import TournamentBracketVisualization from '../../components/TournamentBracketVisualization';
 import { useAuth } from '../../auth-provider';
-import { getTournament, startVoting } from '../../../lib/api';
-
-interface Restaurant {
-  id: string;
-  name: string;
-  cuisine: string;
-}
-
-interface Tournament {
-  id: string;
-  name: string;
-  status: 'nominating' | 'voting' | 'completed';
-  current_round: number;
-  end_time: number;
-  winner: Restaurant | null;
-}
-
-interface Match {
-  id: string;
-  round: number;
-  restaurant1: Restaurant;
-  restaurant2: Restaurant | null;
-  votes1: number;
-  votes2: number;
-  userVote?: string;
-}
-
-interface TournamentData {
-  tournament: Tournament;
-  restaurants: Restaurant[];
-  winner: Restaurant | null;
-  matchesByRound?: Record<number, Match[]>;
-}
+import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments';
 
 export default function TournamentDetailPage({ params }: { params: { id: string } }) {
   const unwrappedParams = React.use(params as unknown as Promise<{ id: string }>);
   const tournamentId = unwrappedParams.id;
   const { user, isLoading: authLoading } = useAuth();
-  const [tournamentData, setTournamentData] = useState<TournamentData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: tournamentData, isLoading, error: queryError } = useTournament(tournamentId);
   const [error, setError] = useState<string | null>(null);
-  const [isStartingVoting, setIsStartingVoting] = useState(false);
-
-  const fetchTournament = async () => {
-    try {
-      setIsLoading(true);
-      const data = await getTournament(tournamentId);
-      setTournamentData(data as TournamentData);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to load tournament');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchTournament();
-    }
-  }, [user, tournamentId]);
+  const startVotingMutation = useStartVoting(tournamentId);
 
   const handleStartVoting = async () => {
-    if (!tournamentData) return;
-    
     try {
-      setIsStartingVoting(true);
-      await startVoting(tournamentId);
-      fetchTournament();
+      await startVotingMutation.mutateAsync();
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to start voting');
-    } finally {
-      setIsStartingVoting(false);
     }
   };
 
@@ -113,13 +55,13 @@ export default function TournamentDetailPage({ params }: { params: { id: string 
     );
   }
 
-  if (error) {
+  if (queryError || error) {
     return (
       <div className="min-h-screen">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="bg-red-50 text-red-700 p-6 rounded-lg shadow-sm">
-            {error}
+            {error || (queryError instanceof Error ? queryError.message : 'Failed to load tournament')}
           </div>
         </main>
       </div>
@@ -162,10 +104,10 @@ export default function TournamentDetailPage({ params }: { params: { id: string 
             {tournament.status === 'nominating' && (
               <button
                 onClick={handleStartVoting}
-                disabled={isStartingVoting || restaurants.length < 2}
+                disabled={startVotingMutation.isPending || restaurants.length < 2}
                 className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
               >
-                {isStartingVoting ? 'Starting...' : 'Start Voting'}
+                {startVotingMutation.isPending ? 'Starting...' : 'Start Voting'}
               </button>
             )}
           </div>
@@ -175,12 +117,14 @@ export default function TournamentDetailPage({ params }: { params: { id: string 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <NominateRestaurantForm 
-                tournamentId={tournamentId} 
-                onSuccess={fetchTournament}
+                tournamentId={tournamentId}
               />
             </div>
             <div>
-              <RestaurantList restaurants={restaurants} />
+              <RestaurantList 
+                restaurants={restaurants} 
+                tournamentId={tournamentId}
+              />
             </div>
           </div>
         )}
@@ -191,12 +135,15 @@ export default function TournamentDetailPage({ params }: { params: { id: string 
             currentRound={tournament.current_round}
             matchesByRound={matchesByRound}
             endTime={tournament.end_time.toString()}
-            onRefresh={fetchTournament}
           />
         )}
         
-        {tournament.status === 'completed' && winner && (
-          <TournamentWinner winner={winner} />
+        {tournament.status === 'completed' && winner && matchesByRound && (
+          <TournamentBracketVisualization
+            tournamentName={tournament.name}
+            matchesByRound={matchesByRound}
+            winner={winner}
+          />
         )}
       </main>
     </div>
