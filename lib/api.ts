@@ -537,4 +537,34 @@ export async function calculateWinner(foodFightId: string) {
   if (updateError) throw updateError;
 
   console.log(`Food Fight ${foodFightId} status updated to completed.`);
+}
+
+// New function to delete a food fight
+export async function deleteFoodFight(foodFightId: string) {
+  console.log(`Deleting food fight ${foodFightId}`);
+  
+  // Optional: Add permission checks here - e.g., check if user is creator
+  // const { data: { user } } = await supabase.auth.getUser();
+  // if (!user) throw new Error('Not logged in');
+  // const { data: foodFightData, error: fetchError } = await supabase
+  //   .from('food_fights')
+  //   .select('creator_id')
+  //   .eq('id', foodFightId)
+  //   .single();
+  // if (fetchError || !foodFightData) throw new Error('Food Fight not found or error fetching details');
+  // if (foodFightData.creator_id !== user.id) throw new Error('Only the creator can delete this Food Fight');
+
+  // Delete the food fight. Associated restaurants/scores should cascade delete
+  // based on the FOREIGN KEY constraints defined in schema.sql.
+  const { error: deleteError } = await supabase
+    .from('food_fights')
+    .delete()
+    .eq('id', foodFightId);
+
+  if (deleteError) {
+    console.error('Error deleting food fight:', deleteError);
+    throw new Error('Failed to delete Food Fight.');
+  }
+
+  console.log(`Food Fight ${foodFightId} deleted successfully.`);
 } 

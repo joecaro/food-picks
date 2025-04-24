@@ -24,7 +24,7 @@ export default function FoodFightDetailPage() {
   const startVotingMutation = useStartVoting(foodFightId);
   const checkVotingEndMutation = useCheckVotingEnd(foodFightId);
   const queryClient = useQueryClient(); // Get query client instance
-
+  const isAdmin = user?.email === 'joe@trysalient.com';
   useEffect(() => {
     // Check if voting time has ended on load
     if (foodFightData?.foodFight?.status === "voting") {
@@ -167,7 +167,7 @@ export default function FoodFightDetailPage() {
               </div>
             </div>
 
-            {foodFight.status === "nominating" && (
+            {foodFight.status === "nominating" && isAdmin && (
               <button
                 onClick={handleStartVoting}
                 disabled={

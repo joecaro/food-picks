@@ -15,7 +15,8 @@ import {
   checkRoundEnd,
   submitScores,
   copyFoodFight,
-  deleteRestaurant
+  deleteRestaurant,
+  deleteFoodFight
 } from '../api';
 
 // Import renamed result type from API
@@ -206,6 +207,27 @@ export function useDeleteRestaurant(foodFightId: string) {
     mutationFn: (restaurantId: string) => deleteRestaurant(restaurantId), // Use renamed API function (no change needed here as it takes restaurantId)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: foodFightKey });
+    },
+  });
+}
+
+// New Hook to delete a Food Fight
+export function useDeleteFoodFight() {
+  const queryClient = useQueryClient();
+  const foodFightsListKey = queryKeys.foodFights();
+
+  return useMutation<void, Error, string>({ // Expects foodFightId (string)
+    mutationFn: (foodFightId: string) => deleteFoodFight(foodFightId),
+    onSuccess: () => {
+      // When a food fight is deleted, invalidate the list query to refetch
+      console.log('Food Fight deleted, invalidating list...');
+      queryClient.invalidateQueries({ queryKey: foodFightsListKey });
+      // Optional: You might want to remove the specific food fight query if cached
+      // queryClient.removeQueries({ queryKey: queryKeys.foodFight(deletedId) });
+    },
+    onError: (err) => {
+      // Optionally show error to user via toast or state
+      console.error('Food Fight deletion failed:', err);
     },
   });
 } 
