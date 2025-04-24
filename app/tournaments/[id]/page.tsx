@@ -12,7 +12,7 @@ import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams?: { [key: string]: string | string[] | undefined };
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export default function TournamentDetailPage({ params }: Props) {
