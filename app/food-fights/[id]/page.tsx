@@ -1,16 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import * as React from "react";
-import Navbar from "@/app/components/Navbar";
-import NominateRestaurantForm from "@/app/components/NominateRestaurantForm";
-import RestaurantList from "@/app/components/RestaurantList";
-import { ScoreVotingForm } from "@/app/components/ScoreVotingForm";
-import { ResultsDisplay } from "@/app/components/ResultsDisplay";
-import { FoodFightWinnerDisplay } from "@/app/components/FoodFightWinnerDisplay";
-import { useAuth } from "@/app/auth-provider";
-import { useFoodFight, useStartVoting, useCheckVotingEnd } from "@/lib/hooks/useFoodFights";
-import { useParams } from "next/navigation";
+import { useState, useEffect } from 'react';
+import * as React from 'react';
+import Navbar from '@/app/components/Navbar';
+import NominateRestaurantForm from '@/app/components/NominateRestaurantForm';
+import RestaurantList from '@/app/components/RestaurantList';
+import { ScoreVotingForm } from '@/app/components/ScoreVotingForm';
+import { ResultsDisplay } from '@/app/components/ResultsDisplay';
+import { FoodFightWinnerDisplay } from '@/app/components/FoodFightWinnerDisplay';
+import { useAuth } from '@/app/auth-provider';
+import { useFoodFight, useStartVoting, useCheckVotingEnd } from '@/lib/hooks/useFoodFights';
+import { useParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
+import { supabase } from '@/lib/supabase'; // Import supabase client
+import { queryKeys } from '@/lib/queryKeys';
 
 export default function FoodFightDetailPage() {
   const params = useParams();
@@ -20,16 +23,53 @@ export default function FoodFightDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const startVotingMutation = useStartVoting(foodFightId);
   const checkVotingEndMutation = useCheckVotingEnd(foodFightId);
+  const queryClient = useQueryClient(); // Get query client instance
 
   useEffect(() => {
+    // Check if voting time has ended on load
     if (foodFightData?.foodFight?.status === "voting") {
       const endTime = new Date(foodFightData.foodFight.end_time).getTime();
       if (Date.now() > endTime) {
         console.log("Voting end time passed, checking status...");
-        checkVotingEndMutation.mutate(false); // Trigger check (force = false)
-      } // else: Could implement a timer to check closer to end_time
+        checkVotingEndMutation.mutate(false);
+      }
     }
-  }, [foodFightData, checkVotingEndMutation]);
+  }, [foodFightData?.foodFight?.status, foodFightData?.foodFight?.end_time, checkVotingEndMutation]);
+
+  // Add Supabase real-time subscription setup
+  useEffect(() => {
+    if (!foodFightId) return; 
+
+    const foodFightQueryKey = ['foodFight', foodFightId];
+
+    const handleDbChange = (payload: unknown) => {
+      console.log('Database change received!', payload);
+      queryClient.invalidateQueries({ queryKey: foodFightQueryKey });
+      queryClient.invalidateQueries({ queryKey: queryKeys.restaurants(foodFightId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.averageScore(foodFightId) });
+    };
+
+    const scoresChannel = supabase.channel(`scores-changes-${foodFightId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores', filter: `food_fight_id=eq.${foodFightId}` }, handleDbChange)
+      .subscribe();
+
+    const restaurantsChannel = supabase.channel(`restaurants-changes-${foodFightId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurants', filter: `food_fight_id=eq.${foodFightId}` }, handleDbChange)
+      .subscribe();
+
+    const foodFightsChannel = supabase.channel(`foodfight-changes-${foodFightId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'food_fights', filter: `id=eq.${foodFightId}` }, handleDbChange)
+      .subscribe();
+
+    return () => {
+      console.log(`Removing subscriptions for food fight ${foodFightId}`);
+      supabase.removeChannel(scoresChannel);
+      supabase.removeChannel(restaurantsChannel);
+      supabase.removeChannel(foodFightsChannel);
+    };
+
+  }, [foodFightId, queryClient]);
+
 
   const handleStartVoting = async () => {
     try {
@@ -88,22 +128,32 @@ export default function FoodFightDetailPage() {
     return (
       <div className="min-h-screen">
         <Navbar />
+      </div>
+    );
+  }
+
+  // Add default empty object for safety during destructuring if foodFightData is null/undefined initially
+  const { foodFight, restaurants, winnerDetails, userScores, aggregateScores } = foodFightData || {}; 
+
+  // Add check for foodFight existence after loading/error states but before render
+  if (!isLoading && !foodFight) {
+     return (
+      <div className="min-h-screen">
+        <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="bg-white p-6 rounded-lg shadow-sm">
-            <p className="text-center text-gray-500">Food Fight not found.</p>
+            <p className="text-center text-gray-500">Food Fight data not available.</p>
           </div>
         </main>
       </div>
     );
   }
 
-  const { foodFight, restaurants, winnerDetails, userScores, aggregateScores } = foodFightData;
-
   return (
     <div className="min-h-screen">
       <Navbar />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -134,7 +184,10 @@ export default function FoodFightDetailPage() {
         {foodFight.status === "nominating" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-              <NominateRestaurantForm foodFightId={foodFightId} />
+              <NominateRestaurantForm
+                foodFightId={foodFightId}
+                restaurants={restaurants}
+              />
             </div>
             <div>
               <RestaurantList
@@ -185,4 +238,4 @@ export default function FoodFightDetailPage() {
       </main>
     </div>
   );
-}
+} 

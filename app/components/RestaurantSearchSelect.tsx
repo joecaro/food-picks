@@ -10,9 +10,10 @@ interface Restaurant {
 
 interface RestaurantSearchSelectProps {
   onSelect: (restaurant: Restaurant) => void;
+  selectedRestaurants: Restaurant[];
 }
 
-export default function RestaurantSearchSelect({ onSelect }: RestaurantSearchSelectProps) {
+export default function RestaurantSearchSelect({ onSelect, selectedRestaurants }: RestaurantSearchSelectProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,7 +34,13 @@ export default function RestaurantSearchSelect({ onSelect }: RestaurantSearchSel
       try {
         setIsLoading(true);
         const data = await getAllRestaurants();
-        setRestaurants(data as Restaurant[]);
+        const filteredData = data.filter(
+          (restaurant: Restaurant) =>
+            !selectedRestaurants.some(
+              (selected: Restaurant) => selected.name === restaurant.name
+            )
+        );
+        setRestaurants(filteredData as Restaurant[]);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       } finally {

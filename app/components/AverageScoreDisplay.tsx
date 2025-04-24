@@ -3,6 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { queryKeys } from '@/lib/queryKeys';
 
 interface AverageScoreDisplayProps {
   foodFightId: string;
@@ -53,14 +54,11 @@ async function fetchAverageScore(foodFightId: string, restaurantId: string): Pro
 }
 
 export function AverageScoreDisplay({ foodFightId, restaurantId }: AverageScoreDisplayProps) {
-    const queryKey = ['averageScore', foodFightId, restaurantId];
-
     const { data, isLoading, error } = useQuery({
-        queryKey: queryKey,
+        queryKey: queryKeys.averageScore(foodFightId, restaurantId),
         queryFn: () => fetchAverageScore(foodFightId, restaurantId),
-        enabled: !!foodFightId && !!restaurantId, // Only run query if IDs are available
-        refetchInterval: 1000, // Refetch every 1 second
-        staleTime: 10000, // Consider data fresh for 10 seconds
+        enabled: !!foodFightId && !!restaurantId,
+        staleTime: 10000,
     });
 
     const averageScore = data?.averageScore ?? null;

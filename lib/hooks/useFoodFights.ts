@@ -20,11 +20,12 @@ import {
 
 // Import renamed result type from API
 import type { GetFoodFightResult } from '../api';
+import { queryKeys } from '../queryKeys';
 
 // List Food Fights
 export function useFoodFightsList() {
   return useQuery({
-    queryKey: ['foodFights'],
+    queryKey: queryKeys.foodFights(), // Use key utility
     queryFn: listFoodFights, // Use renamed API function
   });
 }
@@ -35,7 +36,7 @@ export type FoodFightData = GetFoodFightResult;
 // Get single Food Fight
 export function useFoodFight(id: string) {
   return useQuery({
-    queryKey: ['foodFight', id],
+    queryKey: queryKeys.foodFight(id), // Use key utility
     queryFn: () => getFoodFight(id), // Use renamed API function
     refetchInterval: (query: { state: { data: FoodFightData | undefined } }) => {
       const data = query.state.data;
@@ -55,7 +56,7 @@ export function useCreateFoodFight() {
   return useMutation({
     mutationFn: (name: string) => createFoodFight(name), // Use renamed API function
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['foodFights'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.foodFights() }); // Use key utility
       return data;
     },
   });
@@ -68,7 +69,7 @@ export function useCopyFoodFight() {
   return useMutation({
     mutationFn: (foodFightId: string) => copyFoodFight(foodFightId), // Use renamed API function
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['foodFights'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.foodFights() }); // Use key utility
       return data;
     },
   });
@@ -77,12 +78,41 @@ export function useCopyFoodFight() {
 // Nominate restaurant (Hook name unchanged, use renamed API function)
 export function useNominateRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
+  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
   
   return useMutation({
     mutationFn: ({ name, cuisine }: { name: string; cuisine: string }) => 
       nominateRestaurant(foodFightId, name, cuisine), // Use renamed API function
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
+    
+    // Add optimistic update for nominating
+    onMutate: async (newRestaurantData) => { // Renamed variable for clarity
+      await queryClient.cancelQueries({ queryKey: foodFightKey });
+      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(foodFightKey);
+      
+      // Create restaurant object with temporary ID for optimistic update
+      const optimisticRestaurant = {
+        ...newRestaurantData,
+        id: crypto.randomUUID(), // Add temporary client-side ID
+      };
+
+      queryClient.setQueryData<FoodFightData>(foodFightKey, (oldData) => {
+        if (!oldData) return undefined;
+        return {
+          ...oldData,
+          // Add the restaurant with the temporary ID
+          restaurants: [...(oldData.restaurants || []), optimisticRestaurant],
+        };
+      });
+      return { previousFoodFightData };
+    },
+    onError: (err, newRestaurant, context) => {
+      console.error('Failed to nominate restaurant:', err);
+      if (context?.previousFoodFightData) {
+        queryClient.setQueryData(foodFightKey, context.previousFoodFightData);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
   });
 }
@@ -90,11 +120,12 @@ export function useNominateRestaurant(foodFightId: string) {
 // Start voting (Hook name unchanged, use renamed API function)
 export function useStartVoting(foodFightId: string) {
   const queryClient = useQueryClient();
+  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
   
   return useMutation({
     mutationFn: () => startVoting(foodFightId), // Use renamed API function
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
+      queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
   });
 }
@@ -102,16 +133,16 @@ export function useStartVoting(foodFightId: string) {
 // Submit scores (Hook name unchanged, use renamed API function)
 export function useSubmitScores(foodFightId: string) {
   const queryClient = useQueryClient();
-  const queryKey = ['foodFight', foodFightId];
+  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
 
   return useMutation<void, Error, { restaurant_id: string; score: number }, { previousFoodFightData: FoodFightData | undefined }>({ // Rename context type property
     mutationFn: (scoreData: { restaurant_id: string; score: number }) => 
       submitScores(foodFightId, scoreData), // Use renamed API function
 
     onMutate: async (newScoreData) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(queryKey);
-      queryClient.setQueryData<FoodFightData>(queryKey, (oldData) => {
+      await queryClient.cancelQueries({ queryKey: foodFightKey });
+      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(foodFightKey);
+      queryClient.setQueryData<FoodFightData>(foodFightKey, (oldData) => {
         if (!oldData) return undefined;
         // Use renamed inner property from FoodFightData
         const existingScores = oldData.userScores || []; 
@@ -138,12 +169,12 @@ export function useSubmitScores(foodFightId: string) {
       console.error('Score submission failed, rolling back optimistic update:', err);
       // Use renamed context property
       if (context?.previousFoodFightData) {
-        queryClient.setQueryData(queryKey, context.previousFoodFightData);
+        queryClient.setQueryData(foodFightKey, context.previousFoodFightData);
       }
     },
 
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
   });
 }
@@ -151,14 +182,16 @@ export function useSubmitScores(foodFightId: string) {
 // Check Voting End (Hook name unchanged, use renamed API function)
 export function useCheckVotingEnd(foodFightId: string) {
   const queryClient = useQueryClient();
+  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
+  const foodFightsListKey = queryKeys.foodFights(); // Get list key
   
   return useMutation({
     mutationFn: (force: boolean = false) => checkRoundEnd(foodFightId, force), // Use renamed API function
     onSuccess: (didEnd) => {
       if (didEnd) {
         console.log('Voting ended/winner calculated, refetching data...');
-        queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
-        queryClient.invalidateQueries({ queryKey: ['foodFights'] });
+        queryClient.invalidateQueries({ queryKey: foodFightKey });
+        queryClient.invalidateQueries({ queryKey: foodFightsListKey });
       }
     },
   });
@@ -167,11 +200,12 @@ export function useCheckVotingEnd(foodFightId: string) {
 // Delete restaurant (Hook name unchanged, use renamed API function)
 export function useDeleteRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
+  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
   
   return useMutation({
     mutationFn: (restaurantId: string) => deleteRestaurant(restaurantId), // Use renamed API function (no change needed here as it takes restaurantId)
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['foodFight', foodFightId] });
+      queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
   });
 } 

@@ -108,7 +108,7 @@ export function ScoreVotingForm({
         {restaurants.map((restaurant) => (
           <div
             key={restaurant.id}
-            className="p-4 border rounded-lg shadow-sm bg-card grid grid-cols-[1fr_1fr_4fr] justify-between"
+            className="p-4 border rounded-lg shadow-sm bg-card grid grid-cols-[1fr_1fr_4fr] justify-between max-w-2xl"
           >
             <span>
               <h3 className="text-lg font-medium mb-2">{restaurant.name}</h3>

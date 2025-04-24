@@ -14,12 +14,19 @@ const restaurantSchema = z.object({
 
 type RestaurantFormValues = z.infer<typeof restaurantSchema>;
 
+type Restaurant = {
+  name: string;
+  cuisine: string;
+};
+
 interface NominateRestaurantFormProps {
+  restaurants: Restaurant[];
   foodFightId: string;
 }
 
 export default function NominateRestaurantForm({ 
-  foodFightId
+  foodFightId,
+  restaurants
 }: NominateRestaurantFormProps) {
   const [error, setError] = useState<string | null>(null);
   const nominateMutation = useNominateRestaurant(foodFightId);
@@ -70,8 +77,11 @@ export default function NominateRestaurantForm({
       )}
       
       <form onSubmit={handleSubmit(onSubmit)}>
-        <RestaurantSearchSelect onSelect={handleSelectExistingRestaurant} />
-        
+        <RestaurantSearchSelect
+          selectedRestaurants={restaurants}
+          onSelect={handleSelectExistingRestaurant}
+        />
+
         <div className="mb-4">
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
             Restaurant Name
