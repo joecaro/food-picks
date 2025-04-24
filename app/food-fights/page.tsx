@@ -6,10 +6,28 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../auth-provider";
 import { useFoodFightsList } from "../../lib/hooks/useFoodFights";
 import CreateFoodFightForm from "../components/CreateFoodFightForm";
-
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 export default function FoodFightsPage() {
+  const queryClient = useQueryClient();
   const { user, isLoading: authLoading } = useAuth();
   const { data: foodFights, isLoading, error } = useFoodFightsList();
+
+  useEffect(() => {
+    const handleDBChange = (payload: unknown) => {
+      console.log("Database change received!", payload);
+      queryClient.invalidateQueries({ queryKey: queryKeys.foodFights() });  
+    };
+
+    const channel = supabase.channel("food-fights");
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "food_fights" },
+      handleDBChange
+    );
+  }, [foodFights, queryClient]);
 
   return (
     <div className="min-h-screen">
@@ -27,7 +45,6 @@ export default function FoodFightsPage() {
             </Link>
           )}
         </div>
-
 
         {authLoading || isLoading ? (
           <div className="bg-white p-6 rounded-lg shadow-sm">
