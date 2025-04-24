@@ -33,7 +33,7 @@ export default function RestaurantSearchSelect({ onSelect }: RestaurantSearchSel
       try {
         setIsLoading(true);
         const data = await getAllRestaurants();
-        setRestaurants(data);
+        setRestaurants(data as Restaurant[]);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
       } finally {

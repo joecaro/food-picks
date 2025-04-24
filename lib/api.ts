@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/supabase';
 
 const NOMINATION_TIME = 2 * 60 * 1000; // 2 minutes
 const VOTING_TIME = 2 * 60 * 1000; // 2 minutes per round
@@ -73,7 +74,7 @@ export async function copyTournament(tournamentId: string) {
   if (restaurantsError) throw restaurantsError;
 
   if (restaurants && restaurants.length > 0) {
-    const restaurantsCopy = restaurants.map(restaurant => ({
+    const restaurantsCopy = restaurants.map((restaurant: Database['public']['Tables']['restaurants']['Row']) => ({
       tournament_id: newTournament.id,
       name: restaurant.name,
       cuisine: restaurant.cuisine,
@@ -451,7 +452,7 @@ export async function getTournament(tournamentId: string) {
     .eq('user_id', user.id)
     .in(
       'match_id',
-      matches?.map(match => match.id) || []
+      matches?.map((match: { id: string }) => match.id) || []
     );
 
   if (votesError) throw votesError;
@@ -474,12 +475,20 @@ export async function getTournament(tournamentId: string) {
   };
   
   const matchesByRound: Record<number, Match[]> = {};
-  matches?.forEach(match => {
+
+  matches?.forEach((match: { 
+    id: string; 
+    round: number; 
+    restaurant1: Restaurant; 
+    restaurant2: Restaurant | null;
+    votes1: number;
+    votes2: number;
+  }) => {
     if (!matchesByRound[match.round]) {
       matchesByRound[match.round] = [];
     }
     
-    const userVote = votes?.find(vote => vote.match_id === match.id)?.restaurant_id;
+    const userVote = votes?.find((vote: { match_id: string; restaurant_id: string }) => vote.match_id === match.id)?.restaurant_id;
     
     matchesByRound[match.round].push({
       id: match.id,
@@ -511,7 +520,7 @@ export async function getAllRestaurants() {
     
     // De-duplicate restaurants with the same name
     const uniqueRestaurants = Array.from(
-      new Map(data?.map(item => [item.name, item])).values()
+      new Map(data?.map((item: { name: string; cuisine: string }) => [item.name, item])).values()
     );
     
     return uniqueRestaurants;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '../auth-provider';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
@@ -39,6 +39,12 @@ export default function Navbar() {
                   Tournaments
                 </Link>
               )}
+              <Link
+                href="/history"
+                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+              >
+                History
+              </Link>
             </div>
           </div>
           <div className="flex items-center">
