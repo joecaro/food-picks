@@ -10,7 +10,7 @@ import TournamentBracketVisualization from '../../components/TournamentBracketVi
 import { useAuth } from '../../auth-provider';
 import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments';
 
-export default function TournamentDetailPage({ params }: { params: { id: string } }) {
+export default function TournamentDetailPage({ params }: { params: { id: string }; searchParams?: { [key: string]: string | string[] | undefined } }) {
   const unwrappedParams = React.use(params as unknown as Promise<{ id: string }>);
   const tournamentId = unwrappedParams.id;
   const { user, isLoading: authLoading } = useAuth();
