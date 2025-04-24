@@ -11,12 +11,12 @@ import { useAuth } from '../../auth-provider';
 import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments';
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   searchParams?: { [key: string]: string | string[] | undefined };
 };
 
 export default function TournamentDetailPage({ params }: Props) {
-  const unwrappedParams = React.use(params as unknown as Promise<{ id: string }>);
+  const unwrappedParams = React.use(params);
   const tournamentId = unwrappedParams.id;
   const { user, isLoading: authLoading } = useAuth();
   const { data: tournamentData, isLoading, error: queryError } = useTournament(tournamentId);
