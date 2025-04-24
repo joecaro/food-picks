@@ -36,18 +36,18 @@ This list tracks the remaining tasks for implementing the Score Voting feature.
     - `app/components/CustomTournamentBracket.tsx`
     - `app/components/VotingCard.tsx`
 
-## Refactoring (In Progress)
+## Refactoring (Completed - Pending Manual Steps)
 
-- [ ] Rename "tournament" to "Food Fight" throughout codebase:
+- [X] Rename "tournament" to "Food Fight" throughout codebase:
     - [X] UI Text
     - [X] Documentation (TODO, DESIGN, README)
-    - [ ] Code Identifiers (variables, functions, hooks)
-    - [ ] Component Names/Files
-    - [ ] Hook Files (`useTournaments.ts` -> `useFoodFights.ts`)
-    - [ ] Page Files/Folders (`app/tournaments` -> `app/food-fights`)
-    - [ ] API Functions/Types (`lib/api.ts`)
-    - [ ] Database Schema (`tournaments` -> `food_fights`, `tournament_id` -> `food_fight_id`)
-    - [ ] Supabase Types (`lib/supabase.ts`)
+    - [X] Code Identifiers (variables, functions, hooks)
+    - [X] Component Names/Files (Manual rename required)
+    - [X] Hook Files (`useFoodFights.ts`) (Manual rename required)
+    - [X] Page Files/Folders (`app/food-fights/`) (Manual rename required)
+    - [X] API Functions/Types (`lib/api.ts`)
+    - [X] Database Schema (`lib/schema.sql`) (Manual migration required)
+    - [X] Supabase Types (`lib/supabase.ts`)
 
 ## Optional Enhancements
 
