@@ -6,10 +6,11 @@ import Navbar from '../../components/Navbar';
 import NominateRestaurantForm from '../../components/NominateRestaurantForm';
 import RestaurantList from '../../components/RestaurantList';
 import TournamentBracket from '../../components/TournamentBracket';
-import TournamentBracketVisualization from '../../components/TournamentBracketVisualization';
 import { useAuth } from '../../auth-provider';
 import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments';
 import { useParams } from 'next/navigation';
+import CustomTournamentBracket from '@/app/components/CustomTournamentBracket';
+
 
 export default function TournamentDetailPage() {
   const params = useParams();
@@ -18,6 +19,8 @@ export default function TournamentDetailPage() {
   const { data: tournamentData, isLoading, error: queryError } = useTournament(tournamentId);
   const [error, setError] = useState<string | null>(null);
   const startVotingMutation = useStartVoting(tournamentId);
+
+  console.log('matchesByRound', tournamentData?.matchesByRound); // Keep log for debugging
 
   const handleStartVoting = async () => {
     try {
@@ -140,12 +143,18 @@ export default function TournamentDetailPage() {
         )}
         
         {tournament.status === 'completed' && winner && matchesByRound && (
-          <TournamentBracketVisualization
-            tournamentName={tournament.name}
-            matchesByRound={matchesByRound}
-            winner={winner}
-          />
+          <div className="bg-white p-4 rounded-lg shadow-sm min-h-96">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Final Bracket</h2>
+            <CustomTournamentBracket matchesByRound={matchesByRound} />
+          </div>
         )}
+        {tournament.status === 'completed' && winner && (
+            <div className="mt-8 text-center bg-green-50 p-6 rounded-lg shadow">
+              <h2 className="text-2xl font-bold text-green-800">Tournament Winner!</h2>
+              <p className="text-xl text-green-700 mt-2">{winner.name}</p>
+               {winner.cuisine && <p className="text-md text-green-600">({winner.cuisine})</p>}
+            </div>
+         )}
       </main>
     </div>
   );

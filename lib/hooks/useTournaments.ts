@@ -16,7 +16,8 @@ import {
   copyTournament,
   deleteRestaurant
 } from '../api';
-import { supabase } from '../supabase';
+// import { supabase } from '../supabase'; // Supabase client used in api.ts, not directly here
+import { useAuth } from '@/app/auth-provider'; // Try path alias
 
 // List tournaments
 export function useTournamentsList() {
@@ -45,7 +46,7 @@ interface Match {
 }
 
 // Fix type issues
-type TournamentData = {
+export type TournamentData = {
   tournament: {
     status: string;
     current_round: number;
@@ -135,70 +136,66 @@ export function useStartVoting(tournamentId: string) {
 // Vote
 export function useVote(tournamentId: string) {
   const queryClient = useQueryClient();
-  
+  const { user } = useAuth(); // Get user for optimistic update
+
   return useMutation({
-    mutationFn: ({ matchId, restaurantId }: { matchId: string; restaurantId: string }) => 
+    mutationFn: ({ matchId, restaurantId }: { matchId: string; restaurantId: string }) =>
       vote(matchId, restaurantId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tournament', tournamentId] });
-    },
-    // Add optimistic updates for immediate UI feedback
+    // Remove onSuccess invalidation, rely on optimistic update and potential background refetch/realtime
+    // onSuccess: () => {
+    //   queryClient.invalidateQueries({ queryKey: ['tournament', tournamentId] });
+    // },
     onMutate: async ({ matchId, restaurantId }) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['tournament', tournamentId] });
-      
-      // Save current data
       const previousData = queryClient.getQueryData(['tournament', tournamentId]);
-      
-      // Optimistically update vote counts only
+
       queryClient.setQueryData(['tournament', tournamentId], (old: TournamentData | undefined) => {
-        if (!old || !old.matchesByRound) return old;
-        
-        const newData = JSON.parse(JSON.stringify(old));
+        if (!old || !old.matchesByRound || !user) return old; // Need user for userVote
+
+        // Deep clone to avoid modifying the original cache object directly
+        const newData = JSON.parse(JSON.stringify(old)); 
         const currentRound = newData.tournament.current_round;
-        const matches = newData.matchesByRound[currentRound];
+
+        // Ensure the round exists in matchesByRound
+        if (!newData.matchesByRound[currentRound]) return old; 
         
+        const matches = newData.matchesByRound[currentRound];
         const matchIndex = matches.findIndex((m: { id: string }) => m.id === matchId);
+
         if (matchIndex >= 0) {
           const match = matches[matchIndex];
+          
+          // Avoid double voting optimistically if user already voted
+          if (match.userVote) return old; 
+
+          // Optimistically update counts
           if (restaurantId === match.restaurant1.id) {
             match.votes1 += 1;
           } else if (match.restaurant2 && restaurantId === match.restaurant2.id) {
             match.votes2 += 1;
           }
-          // Do NOT set match.userVote here
+          
+          // Optimistically set the user's vote
+          match.userVote = restaurantId; 
         }
-        
+
         return newData;
       });
-      
-      // Query the current user's vote for this match and update the cache accordingly
-      const { data: authData } = await supabase.auth.getUser();
-      const currentUserId = authData?.user?.id;
-      if (currentUserId) {
-        const { data: voteData } = await supabase
-          .from('votes')
-          .select('restaurant_id')
-          .eq('match_id', matchId)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-        if (voteData) {
-          queryClient.setQueryData(['tournament', tournamentId], (old: TournamentData | undefined) => {
-            if (!old || !old.matchesByRound) return old;
-            const newData = JSON.parse(JSON.stringify(old));
-            const currentRound = newData.tournament.current_round;
-            const matches = newData.matchesByRound[currentRound];
-            const matchIndex = matches.findIndex((m: { id: string }) => m.id === matchId);
-            if (matchIndex >= 0) {
-              matches[matchIndex].userVote = voteData.restaurant_id;
-            }
-            return newData;
-          });
-        }
-      }
-      
+
       return { previousData };
     },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(['tournament', tournamentId], context.previousData);
+      }
+      // Optionally: show error notification to user
+      console.error('Vote failed:', err);
+    },
+    onSettled: () => {
+       // Refetch after error or success to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ['tournament', tournamentId] });
+    }
   });
 }
 
