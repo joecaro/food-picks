@@ -9,15 +9,11 @@ import TournamentBracket from '../../components/TournamentBracket';
 import TournamentBracketVisualization from '../../components/TournamentBracketVisualization';
 import { useAuth } from '../../auth-provider';
 import { useTournament, useStartVoting } from '../../../lib/hooks/useTournaments';
+import { useParams } from 'next/navigation';
 
-type Props = {
-  params: Promise<{ id: string }>;
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
-};
-
-export default function TournamentDetailPage({ params }: Props) {
-  const unwrappedParams = React.use(params);
-  const tournamentId = unwrappedParams.id;
+export default function TournamentDetailPage() {
+  const params = useParams();
+  const tournamentId = params.id as string;
   const { user, isLoading: authLoading } = useAuth();
   const { data: tournamentData, isLoading, error: queryError } = useTournament(tournamentId);
   const [error, setError] = useState<string | null>(null);
