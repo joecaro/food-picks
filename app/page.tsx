@@ -28,7 +28,7 @@ export default function Home() {
               <li>
                 <span className="font-medium">Nominate restaurants</span>
                 <p className="ml-6 text-gray-600">
-                  Everyone has 2 minutes to nominate their favorite lunch spots.
+                Add your favorite restaurants to the tournament.
                 </p>
               </li>
               <li>
