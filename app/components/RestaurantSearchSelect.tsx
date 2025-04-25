@@ -134,7 +134,7 @@ export default function RestaurantSearchSelect({ onSelect, selectedRestaurants }
       </div>
       
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 overflow-auto border border-gray-200">
+        <div className="absolute z-10 mt-1 w-full bg-background shadow-lg max-h-60 rounded-md py-1 overflow-auto border border-gray-200">
           {filteredRestaurants.length > 0 ? (
             filteredRestaurants.map((restaurant, index) => (
               <div

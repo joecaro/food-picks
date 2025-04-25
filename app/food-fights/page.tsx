@@ -16,7 +16,7 @@ export default function FoodFightsPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-3xl font-bold text-gray-900">Food Fights</h1>
+          <h1 className="text-3xl font-bold text-primary">Food Fights</h1>
 
           {user ? (
             <CreateFoodFightForm />
@@ -28,11 +28,11 @@ export default function FoodFightsPage() {
         </div>
 
         {authLoading ? (
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-muted-foreground p-6 rounded-lg shadow-sm">
             <p className="text-center text-gray-500">Loading...</p>
           </div>
         ) : !user ? (
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-muted-foreground p-6 rounded-lg shadow-sm">
             <p className="text-center text-gray-500">
               Please login to view and create Food Fights.
             </p>

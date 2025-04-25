@@ -69,7 +69,7 @@ export default function HistoryPage() {
             {completedFoodFights.map((foodFight: FoodFight) => (
               <div 
                 key={foodFight.id}
-                className="bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow"
+                className="bg-background rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow"
               >
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold text-gray-900">{foodFight.name}</h2>

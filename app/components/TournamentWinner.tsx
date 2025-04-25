@@ -12,7 +12,7 @@ interface TournamentWinnerProps {
 
 export default function TournamentWinner({ winner }: TournamentWinnerProps) {
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm border border-green-200">
+    <div className="bg-background p-6 rounded-lg shadow-sm border border-green-200">
       <h2 className="text-xl font-medium text-center mb-2">Winner!</h2>
       
       <div className="flex justify-center">

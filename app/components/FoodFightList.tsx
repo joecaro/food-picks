@@ -78,7 +78,7 @@ export default function FoodFightList() {
 
   if (isLoading) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm">
+      <div className="bg-background p-6 rounded-lg shadow-sm">
         <p className="text-center text-gray-500">Loading Food Fights...</p>
       </div>
     );
@@ -94,7 +94,7 @@ export default function FoodFightList() {
 
   if (!foodFights || foodFights.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm">
+      <div className="bg-background p-6 rounded-lg shadow-sm">
         <p className="text-center text-gray-500">No Food Fights found. Create one to get started!</p>
       </div>
     );
@@ -102,7 +102,7 @@ export default function FoodFightList() {
 
   return (
     <>
-      <div className="bg-white p-6 rounded-lg shadow-sm">
+      <div className="bg-background p-6 rounded-lg shadow-sm">
         <div className="space-y-3">
           {foodFights.map((foodFight: FoodFightListItem) => {
             let winnerText = null;
@@ -113,7 +113,7 @@ export default function FoodFightList() {
             return (
               <ContextMenu key={foodFight.id}>
                 <ContextMenuTrigger 
-                   className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                   className="block border border-border rounded-lg p-4 hover:bg-border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                    asChild
                  >
                   <Link href={`/food-fights/${foodFight.id}`}> 

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-
+import { ThemeProvider } from 'next-themes';
 type AuthContextType = {
   user: User | null;
   session: Session | null;
@@ -58,7 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, session, isLoading }}>
-      {children}
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme={false} storageKey="theme">
+        {children}
+      </ThemeProvider>
     </AuthContext.Provider>
   );
 }

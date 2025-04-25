@@ -33,14 +33,14 @@ export default function RestaurantList({ restaurants, foodFightId }: RestaurantL
 
   if (restaurants.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-sm text-center text-gray-500">
+      <div className="bg-background p-6 rounded-lg shadow-sm text-center text-gray-500">
         No restaurants have been nominated yet.
       </div>
     );
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm">
+    <div className="bg-background p-6 rounded-lg shadow-sm">
       {error && (
         <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
           {error}

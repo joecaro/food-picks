@@ -85,7 +85,7 @@ export default function FoodFightDetailPage() {
       <div className="min-h-screen">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-muted-foreground p-6 rounded-lg shadow-sm">
             <p className="text-center text-gray-500">Loading Food Fight...</p>
           </div>
         </main>
@@ -98,7 +98,7 @@ export default function FoodFightDetailPage() {
       <div className="min-h-screen">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="bg-muted-foreground p-6 rounded-lg shadow-sm">
             <p className="text-center text-gray-500">
               Please login to view Food Fights.
             </p>
@@ -141,8 +141,8 @@ export default function FoodFightDetailPage() {
       <div className="min-h-screen">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <p className="text-center text-gray-500">Food Fight data not available.</p>
+          <div className="bg-background p-6 rounded-lg shadow-sm">
+            <p className="text-center text-foreground">Food Fight data not available.</p>
           </div>
         </main>
       </div>
@@ -157,10 +157,10 @@ export default function FoodFightDetailPage() {
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">
+              <h1 className="text-3xl font-bold text-primary mb-1">
                 {foodFight.name}
               </h1>
-              <div className="text-gray-500">
+              <div className="text-foreground">
                 {foodFight.status === "nominating" && "Nomination Phase"}
                 {foodFight.status === "voting" && "Voting Phase"}
                 {foodFight.status === "completed" && "Food Fight Complete"}
@@ -229,7 +229,7 @@ export default function FoodFightDetailPage() {
             )}
             {!winnerDetails &&
               (!aggregateScores || aggregateScores.length === 0) && (
-                <div className="bg-white p-6 rounded-lg shadow-sm text-center text-gray-500">
+                <div className="bg-background p-6 rounded-lg shadow-sm text-center text-gray-500">
                   Food Fight completed, but no winner or scores found.
                 </div>
               )}

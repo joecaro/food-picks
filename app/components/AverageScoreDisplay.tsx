@@ -93,7 +93,7 @@ export function AverageScoreDisplay({ foodFightId, restaurantId }: AverageScoreD
             <Tooltip>
                 <TooltipTrigger asChild>
                      {/* Vertical Progress Bar Container */}
-                     <div className="relative w-5 h-16 bg-gray-200 rounded-full overflow-hidden cursor-default mx-auto">
+                     <div className="relative w-5 h-16 bg-muted rounded-full overflow-hidden cursor-default mx-auto">
                         {barContent}
                     </div>
                 </TooltipTrigger>

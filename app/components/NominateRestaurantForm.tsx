@@ -67,7 +67,7 @@ export default function NominateRestaurantForm({
   };
 
   return (
-    <div className="bg-white shadow-sm rounded-lg p-6">
+    <div className="bg-background shadow-sm rounded-lg p-6">
       <h2 className="text-lg font-medium mb-4">Nominate a Restaurant</h2>
       
       {error && (
