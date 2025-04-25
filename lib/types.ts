@@ -1,7 +1,7 @@
-export type Restaurant = {
+export interface Restaurant {
   id: string;
   name: string;
   cuisine: string;
-  link?: string;
-};
+  link?: string | null;
+}
 
