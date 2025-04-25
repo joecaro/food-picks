@@ -1,33 +1,28 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
-import { getAllRestaurants } from '../../lib/api';
-
-interface Restaurant {
-  name: string;
-  cuisine: string;
-}
+import { useState, useEffect, useRef } from "react";
+import { getAllRestaurants } from "../../lib/api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import type { Restaurant } from '@/lib/types';
 
 interface RestaurantSearchSelectProps {
-  onSelect: (restaurant: Restaurant) => void;
-  selectedRestaurants: Restaurant[];
+  onSelect: (restaurant: Restaurant) => void; // Use imported type
+  restaurants: Restaurant[];
 }
 
-export default function RestaurantSearchSelect({ onSelect, selectedRestaurants }: RestaurantSearchSelectProps) {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+export default function RestaurantSearchSelect({
+  onSelect,
+  restaurants,
+}: RestaurantSearchSelectProps) {
+  const [allRestaurants, setAllRestaurants] = useState<Restaurant[]>([]); // Store all fetched restaurants
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Calculate filtered restaurants early
-  const filteredRestaurants = restaurants.filter(
-    restaurant => 
-      restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      restaurant.cuisine.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -35,85 +30,112 @@ export default function RestaurantSearchSelect({ onSelect, selectedRestaurants }
         setIsLoading(true);
         const data = await getAllRestaurants();
         const filteredData = data.filter(
-          (restaurant: Restaurant) =>
-            !selectedRestaurants.some(
-              (selected: Restaurant) => selected.name === restaurant.name
-            )
+          (restaurant) => !restaurants.some((r) => r.link === restaurant.link)
         );
-        setRestaurants(filteredData as Restaurant[]);
+        setAllRestaurants(filteredData as Restaurant[]);
       } catch (error) {
-        console.error('Error fetching restaurants:', error);
+        console.error("Error fetching restaurants:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchRestaurants();
-  }, []);
+  }, []); // Run only once on mount
+
+  // Filter based on search term
+  const filteredRestaurants = allRestaurants.filter(
+    (restaurant) =>
+      restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      restaurant.cuisine.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   useEffect(() => {
-    // Add click outside listener to close dropdown
+    // Add click outside listener
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    // Handle keyboard navigation
+    // Keyboard navigation
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || filteredRestaurants.length === 0) return;
 
       switch (e.key) {
-        case 'ArrowDown':
+        case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex(prevIndex => 
-            prevIndex < filteredRestaurants.length - 1 ? prevIndex + 1 : prevIndex
+          setSelectedIndex(
+            (prevIndex) => (prevIndex + 1) % filteredRestaurants.length // Cycle through
           );
           break;
-        case 'ArrowUp':
+        case "ArrowUp":
           e.preventDefault();
-          setSelectedIndex(prevIndex => (prevIndex > 0 ? prevIndex - 1 : 0));
+          setSelectedIndex(
+            (prevIndex) =>
+              (prevIndex - 1 + filteredRestaurants.length) %
+              filteredRestaurants.length // Cycle through
+          );
           break;
-        case 'Enter':
+        case "Enter":
           e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < filteredRestaurants.length) {
+          if (selectedIndex >= 0) {
             handleSelect(filteredRestaurants[selectedIndex]);
           }
           break;
-        case 'Escape':
+        case "Escape":
           setIsOpen(false);
           break;
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
+    // Depend on filteredRestaurants to reset selection correctly on filter change
   }, [isOpen, selectedIndex, filteredRestaurants]);
 
-  // Reset selected index when filtered results change
+  // Reset selected index when search term changes
   useEffect(() => {
     setSelectedIndex(-1);
   }, [searchTerm]);
 
+  // Scroll selected item into view
+  useEffect(() => {
+    if (isOpen && selectedIndex >= 0) {
+      const listElement = dropdownRef.current?.querySelector(
+        'div[role="listbox"]'
+      );
+      const selectedElement = listElement?.children[
+        selectedIndex
+      ] as HTMLElement;
+      selectedElement?.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex, isOpen]);
+
   const handleSelect = (restaurant: Restaurant) => {
     setIsOpen(false);
-    onSelect(restaurant);
-    setSearchTerm('');
+    onSelect(restaurant); // Send full selected restaurant object
+    setSearchTerm(""); // Clear search after selection
+    inputRef.current?.blur(); // Unfocus input
   };
 
   return (
     <div className="relative mb-6" ref={dropdownRef}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Select an existing restaurant or add a new one
-      </label>
-      
-      <div className="relative">
-        <input
+      <Label htmlFor="restaurant-search" className="text-muted-foreground">
+        Select existing or type to add new
+      </Label>
+
+      <div className="relative mt-1">
+        <Input
+          id="restaurant-search"
           ref={inputRef}
           type="text"
           value={searchTerm}
@@ -123,43 +145,65 @@ export default function RestaurantSearchSelect({ onSelect, selectedRestaurants }
           }}
           onFocus={() => setIsOpen(true)}
           placeholder="Search restaurants..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          autoComplete="off"
+          aria-autocomplete="list"
+          aria-controls="restaurant-listbox"
+          aria-expanded={isOpen}
+          aria-activedescendant={
+            selectedIndex >= 0 ? `option-${selectedIndex}` : undefined
+          }
         />
-        
+
         {isLoading && (
-          <div className="absolute right-3 top-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
           </div>
         )}
       </div>
-      
+
       {isOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-background shadow-lg max-h-60 rounded-md py-1 overflow-auto border border-gray-200">
+        <div
+          id="restaurant-listbox"
+          role="listbox"
+          className="absolute z-10 mt-1 w-full bg-popover shadow-lg max-h-60 rounded-md py-1 text-sm overflow-auto border border-border"
+        >
           {filteredRestaurants.length > 0 ? (
             filteredRestaurants.map((restaurant, index) => (
               <div
-                key={`${restaurant.name}-${index}`}
-                className={`px-4 py-2 hover:bg-blue-50 cursor-pointer flex justify-between ${
-                  selectedIndex === index ? 'bg-blue-50' : ''
+                id={`option-${index}`}
+                key={restaurant.id} // Use unique ID
+                role="option"
+                aria-selected={selectedIndex === index}
+                className={`px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center ${
+                  selectedIndex === index ? "bg-accent" : ""
                 }`}
                 onClick={() => handleSelect(restaurant)}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
-                <span className="font-medium">{restaurant.name}</span>
-                <span className="text-gray-500 text-sm">{restaurant.cuisine}</span>
+                <span className="font-medium text-popover-foreground">
+                  {restaurant.name}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {restaurant.cuisine}
+                </span>
               </div>
             ))
           ) : (
-            <div className="px-4 py-2 text-gray-500">
-              {searchTerm ? 'No matching restaurants found' : 'No restaurants found'}
+            <div className="px-3 py-2 text-muted-foreground">
+              {isLoading
+                ? "Loading..."
+                : searchTerm
+                ? "No matching restaurants"
+                : "No restaurants found"}
             </div>
           )}
         </div>
       )}
-      
-      <div className="mt-1 text-sm text-gray-500">
+
+      {/* Keep hint for adding new */}
+      {/* <div className="mt-1 text-sm text-muted-foreground">
         {searchTerm ? 'Press Enter to add as new restaurant' : 'Start typing to search existing restaurants'}
-      </div>
+      </div> */}
     </div>
   );
-} 
+}

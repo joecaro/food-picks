@@ -10,18 +10,20 @@ import {
   createFoodFight, 
   getFoodFight, 
   listFoodFights, 
-  nominateRestaurant,
+  nominateRestaurantToFoodFight,
   startVoting,
   checkRoundEnd,
   submitScores,
   copyFoodFight,
-  deleteRestaurant,
+  removeRestaurantFromFoodFight,
   deleteFoodFight
 } from '../api';
 
 // Import renamed result type from API
 import type { GetFoodFightResult } from '../api';
 import { queryKeys } from '../queryKeys';
+// Remove unused import as Restaurant type is implicitly handled via GetFoodFightResult
+// import type { Restaurant } from '../types'; 
 
 // List Food Fights
 export function useFoodFightsList() {
@@ -76,42 +78,26 @@ export function useCopyFoodFight() {
   });
 }
 
-// Nominate restaurant (Hook name unchanged, use renamed API function)
+// Nominate restaurant (Refactored)
+// Input: restaurant details (name, cuisine, link) OR existing restaurant ID
+interface NominateRestaurantInput {
+  name: string;
+  cuisine: string;
+  link?: string | null;
+}
+
 export function useNominateRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
-  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
+  const foodFightKey = queryKeys.foodFight(foodFightId); 
   
   return useMutation({
-    mutationFn: ({ name, cuisine }: { name: string; cuisine: string }) => 
-      nominateRestaurant(foodFightId, name, cuisine), // Use renamed API function
+    mutationFn: (restaurantData: NominateRestaurantInput) => 
+      nominateRestaurantToFoodFight(foodFightId, restaurantData), // Use new API function
     
-    // Add optimistic update for nominating
-    onMutate: async (newRestaurantData) => { // Renamed variable for clarity
-      await queryClient.cancelQueries({ queryKey: foodFightKey });
-      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(foodFightKey);
-      
-      // Create restaurant object with temporary ID for optimistic update
-      const optimisticRestaurant = {
-        ...newRestaurantData,
-        id: crypto.randomUUID(), // Add temporary client-side ID
-      };
-
-      queryClient.setQueryData<FoodFightData>(foodFightKey, (oldData) => {
-        if (!oldData) return undefined;
-        return {
-          ...oldData,
-          // Add the restaurant with the temporary ID
-          restaurants: [...(oldData.restaurants || []), optimisticRestaurant],
-        };
-      });
-      return { previousFoodFightData };
-    },
-    onError: (err, newRestaurant, context) => {
-      console.error('Failed to nominate restaurant:', err);
-      if (context?.previousFoodFightData) {
-        queryClient.setQueryData(foodFightKey, context.previousFoodFightData);
-      }
-    },
+    // Optimistic update might be complex now due to potential new restaurant creation
+    // For simplicity, we'll just invalidate the query on success/settled
+    // onMutate: async (newNomination) => { ... },
+    // onError: (err, newNomination, context) => { ... },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
@@ -198,14 +184,38 @@ export function useCheckVotingEnd(foodFightId: string) {
   });
 }
 
-// Delete restaurant (Hook name unchanged, use renamed API function)
+// Delete restaurant from Food Fight (Refactored)
 export function useDeleteRestaurant(foodFightId: string) {
   const queryClient = useQueryClient();
-  const foodFightKey = queryKeys.foodFight(foodFightId); // Get key from utility
+  const foodFightKey = queryKeys.foodFight(foodFightId); 
   
   return useMutation({
-    mutationFn: (restaurantId: string) => deleteRestaurant(restaurantId), // Use renamed API function (no change needed here as it takes restaurantId)
-    onSuccess: () => {
+    // Mutation function now needs both IDs
+    mutationFn: (restaurantId: string) => 
+      removeRestaurantFromFoodFight(foodFightId, restaurantId), // Use new API function
+    
+    // Optimistic update: remove the specific restaurant from the list
+    onMutate: async (restaurantIdToRemove) => {
+      await queryClient.cancelQueries({ queryKey: foodFightKey });
+      const previousFoodFightData = queryClient.getQueryData<FoodFightData>(foodFightKey);
+
+      queryClient.setQueryData<FoodFightData>(foodFightKey, (oldData) => {
+        if (!oldData) return undefined;
+        return {
+          ...oldData,
+          // Filter out the removed restaurant
+          restaurants: oldData.restaurants?.filter(r => r.id !== restaurantIdToRemove) || [],
+        };
+      });
+      return { previousFoodFightData };
+    },
+    onError: (err, removedRestaurantId, context) => {
+      console.error('Failed to remove restaurant:', err);
+      if (context?.previousFoodFightData) {
+        queryClient.setQueryData(foodFightKey, context.previousFoodFightData);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: foodFightKey });
     },
   });

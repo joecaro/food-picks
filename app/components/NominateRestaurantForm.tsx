@@ -6,18 +6,18 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import RestaurantSearchSelect from './RestaurantSearchSelect';
 import { useNominateRestaurant } from '../../lib/hooks/useFoodFights';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import type { Restaurant } from '@/lib/types';
 
 const restaurantSchema = z.object({
   name: z.string().min(2, { message: 'Restaurant name must be at least 2 characters' }),
   cuisine: z.string().min(2, { message: 'Cuisine must be at least 2 characters' }),
+  link: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
 });
 
 type RestaurantFormValues = z.infer<typeof restaurantSchema>;
-
-type Restaurant = {
-  name: string;
-  cuisine: string;
-};
 
 interface NominateRestaurantFormProps {
   restaurants: Restaurant[];
@@ -41,13 +41,15 @@ export default function NominateRestaurantForm({
     defaultValues: {
       name: '',
       cuisine: '',
+      link: '',
     },
   });
 
-  const handleSelectExistingRestaurant = (restaurant: { name: string; cuisine: string }) => {
+  const handleSelectExistingRestaurant = (restaurant: Restaurant) => {
     onSubmit({
       name: restaurant.name,
       cuisine: restaurant.cuisine,
+      link: restaurant.link || '',
     });
   };
 
@@ -55,10 +57,12 @@ export default function NominateRestaurantForm({
     setError(null);
     
     try {
-      await nominateMutation.mutateAsync({
+      const payload = {
         name: data.name,
         cuisine: data.cuisine,
-      });
+        link: data.link || null,
+      };
+      await nominateMutation.mutateAsync(payload);
       reset();
     } catch (err) {
       console.error(err);
@@ -67,62 +71,73 @@ export default function NominateRestaurantForm({
   };
 
   return (
-    <div className="bg-background shadow-sm rounded-lg p-6">
+    <div className="bg-card shadow-sm rounded-lg p-6 border border-border">
       <h2 className="text-lg font-medium mb-4">Nominate a Restaurant</h2>
       
       {error && (
-        <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
+        <div className="bg-destructive/10 text-destructive p-3 rounded-md mb-4">
           {error}
         </div>
       )}
       
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <RestaurantSearchSelect
-          selectedRestaurants={restaurants}
+          restaurants={restaurants}
           onSelect={handleSelectExistingRestaurant}
         />
 
-        <div className="mb-4">
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            Restaurant Name
-          </label>
-          <input
+        <div>
+          <Label htmlFor="name">Restaurant Name</Label>
+          <Input
             id="name"
             type="text"
             {...register('name')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Restaurant name"
             disabled={nominateMutation.isPending}
+            aria-invalid={errors.name ? "true" : "false"}
           />
           {errors.name && (
-            <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.name.message}</p>
           )}
         </div>
         
-        <div className="mb-4">
-          <label htmlFor="cuisine" className="block text-sm font-medium text-gray-700 mb-1">
-            Cuisine
-          </label>
-          <input
+        <div>
+          <Label htmlFor="cuisine">Cuisine</Label>
+          <Input
             id="cuisine"
             type="text"
             {...register('cuisine')}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Italian, Mexican, etc."
             disabled={nominateMutation.isPending}
+            aria-invalid={errors.cuisine ? "true" : "false"}
           />
           {errors.cuisine && (
-            <p className="mt-1 text-sm text-red-600">{errors.cuisine.message}</p>
+            <p className="mt-1 text-sm text-destructive">{errors.cuisine.message}</p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="link">Link (Optional)</Label>
+          <Input
+            id="link"
+            type="url"
+            {...register('link')}
+            placeholder="https://www.doordash.com/..."
+            disabled={nominateMutation.isPending}
+            aria-invalid={errors.link ? "true" : "false"}
+          />
+          {errors.link && (
+            <p className="mt-1 text-sm text-destructive">{errors.link.message}</p>
           )}
         </div>
         
-        <button
+        <Button
           type="submit"
           disabled={nominateMutation.isPending}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+          className="w-full"
         >
           {nominateMutation.isPending ? 'Nominating...' : 'Nominate Restaurant'}
-        </button>
+        </Button>
       </form>
     </div>
   );

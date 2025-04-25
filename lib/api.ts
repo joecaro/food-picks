@@ -97,17 +97,20 @@ export async function copyFoodFight(foodFightId: string) {
   return newFoodFight;
 }
 
-export async function nominateRestaurant(foodFightId: string, name: string, cuisine: string) {
+export async function nominateRestaurantToFoodFight(
+  foodFightId: string,
+  restaurantData: { name: string; cuisine: string; link?: string | null }
+) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Check food fight status
+  // Check food fight status remains 'nominating'
   const { data: foodFight, error: foodFightError } = await supabase
     .from('food_fights')
-    .select()
+    .select('status')
     .eq('id', foodFightId)
     .single();
 
@@ -115,16 +118,73 @@ export async function nominateRestaurant(foodFightId: string, name: string, cuis
   if (!foodFight) throw new Error('Food Fight not found');
   if (foodFight.status !== 'nominating') throw new Error('Food Fight not in nomination phase');
 
-  // Add restaurant
-  const { error } = await supabase
+  // 1. Find or Create the restaurant in the central 'restaurants' table
+  let restaurantId: string;
+
+  const { data: existingRestaurant, error: findError } = await supabase
     .from('restaurants')
+    .select('id')
+    .eq('name', restaurantData.name) // Assuming name is the unique identifier for now
+    .maybeSingle(); // Use maybeSingle to handle not found
+
+  if (findError && findError.code !== 'PGRST116') { // Ignore 'not found' error code
+    console.error("Error finding restaurant:", findError);
+    throw findError; // Rethrow other errors
+  }
+
+  if (existingRestaurant) {
+    restaurantId = existingRestaurant.id;
+    // Optional: Update existing restaurant cuisine/link if needed
+    // const { error: updateRestError } = await supabase
+    //   .from('restaurants')
+    //   .update({ 
+    //     cuisine: restaurantData.cuisine,
+    //     link: restaurantData.link || null
+    //   })
+    //   .eq('id', restaurantId);
+    // if (updateRestError) console.warn("Failed to update existing restaurant details:", updateRestError);
+  } else {
+    // Create new restaurant
+    const { data: newRestaurant, error: createError } = await supabase
+      .from('restaurants')
+      .insert({
+        name: restaurantData.name,
+        cuisine: restaurantData.cuisine,
+        link: restaurantData.link || null,
+        // created_by: user.id // Optional: track who created it
+      })
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error("Error creating restaurant:", createError);
+      throw createError;
+    }
+    if (!newRestaurant) throw new Error("Failed to create restaurant and get ID.");
+    restaurantId = newRestaurant.id;
+  }
+
+  // 2. Link the restaurant to the food fight in the junction table
+  const { error: linkError } = await supabase
+    .from('food_fight_restauraunt')
     .insert({
       food_fight_id: foodFightId,
-      name,
-      cuisine,
+      restaurant_id: restaurantId,
     });
 
-  if (error) throw error;
+  // Handle potential duplicate link error (e.g., unique constraint violation)
+  if (linkError) {
+    if (linkError.code === '23505') { // Postgres unique violation code
+      console.warn(`Restaurant ${restaurantId} already nominated for food fight ${foodFightId}.`);
+      // Optionally throw a more user-friendly error or just ignore
+      throw new Error('Restaurant already nominated for this Food Fight.');
+    } else {
+      console.error("Error linking restaurant to food fight:", linkError);
+      throw linkError; // Rethrow other errors
+    }
+  }
+
+  console.log(`Restaurant ${restaurantId} linked to food fight ${foodFightId}`);
 }
 
 export async function startVoting(foodFightId: string) {
@@ -137,7 +197,7 @@ export async function startVoting(foodFightId: string) {
   // Check food fight status
   const { data: foodFight, error: foodFightError } = await supabase
     .from('food_fights')
-    .select()
+    .select('status') // Only need status
     .eq('id', foodFightId)
     .single();
 
@@ -145,14 +205,14 @@ export async function startVoting(foodFightId: string) {
   if (!foodFight) throw new Error('Food Fight not found');
   if (foodFight.status !== 'nominating') throw new Error('Food Fight not in nomination phase');
 
-  // Get restaurants
-  const { data: restaurants, error: restaurantsError } = await supabase
-    .from('restaurants')
-    .select()
+  // Get count of restaurants linked to this food fight
+  const { count, error: countError } = await supabase
+    .from('food_fight_restauraunt')
+    .select('*' , { count: 'exact', head: true }) // Select nothing, just get count
     .eq('food_fight_id', foodFightId);
 
-  if (restaurantsError) throw restaurantsError;
-  if (!restaurants || restaurants.length < 2) throw new Error('Need at least 2 restaurants');
+  if (countError) throw countError;
+  if (count === null || count < 2) throw new Error('Need at least 2 nominated restaurants to start voting');
 
   // Update food fight status
   const endTimeDate = new Date(Date.now() + VOTING_TIME);
@@ -218,25 +278,26 @@ type UserScore = {
 
 type AggregateScore = {
   restaurant_id: string;
-  name: string; // Include restaurant name
-  cuisine: string; // Include restaurant cuisine
+  name: string;
+  cuisine: string;
+  link?: string | null;
   average_score: number;
   vote_count: number;
 }
 
 // Define and export the structure for the result of getFoodFight
 export type GetFoodFightResult = {
-  foodFight: { // Renamed property
+  foodFight: {
     id: string;
     name: string;
     status: string;
     end_time: string;
     creator_id: string;
     created_at: string;
-    winner: string | null; // Winner restaurant ID
+    winner: string | null;
   };
-  restaurants: { id: string; name: string; cuisine: string }[];
-  winnerDetails: { id: string; name: string; cuisine: string } | null; // Full details if winner exists
+  restaurants: { id: string; name: string; cuisine: string; link?: string | null }[];
+  winnerDetails: { id: string; name: string; cuisine: string; link?: string | null } | null;
   userScores: UserScore[];
   aggregateScores: AggregateScore[];
 };
@@ -261,17 +322,26 @@ export async function getFoodFight(foodFightId: string): Promise<GetFoodFightRes
   if (foodFightError) throw foodFightError;
   if (!foodFight) throw new Error('Food Fight not found');
 
-  // Get restaurants
-  const { data: restaurants, error: restaurantsError } = await supabase
-    .from('restaurants')
-    .select('id, name, cuisine')
+  // Get restaurants associated with this food fight via the junction table
+  const { data: fightRestaurantsData, error: restaurantsError } = await supabase
+    .from('food_fight_restauraunt')
+    .select(`
+      restaurants ( id, name, cuisine, link )
+    `)
     .eq('food_fight_id', foodFightId);
 
   if (restaurantsError) throw restaurantsError;
   
-  const restaurantList = restaurants || [];
+  // Correctly extract and type the restaurant details from the join
+  const restaurantList: { id: string; name: string; cuisine: string; link?: string | null }[] = 
+    fightRestaurantsData
+      ?.map(item => item.restaurants) // Extract the 'restaurants' object/array
+      .flat() // Flatten if 'restaurants' is an array (depends on relationship)
+      .filter((restaurant): restaurant is NonNullable<typeof restaurant> => restaurant != null && typeof restaurant === 'object' && 'id' in restaurant) // Use a simpler type guard
+      .map(restaurant => restaurant as { id: string; name: string; cuisine: string; link?: string | null }) // Assert type after filtering
+    || [];
 
-  // Find winner details from the restaurant list if winner ID exists
+  // Find winner details
   const winnerDetails = foodFight.winner 
     ? restaurantList.find(r => r.id === foodFight.winner) || null
     : null;
@@ -304,6 +374,7 @@ export async function getFoodFight(foodFightId: string): Promise<GetFoodFightRes
       if (allScoresData && allScoresData.length > 0) {
           const restaurantScores: Record<string, { totalScore: number; voteCount: number }> = {};
           allScoresData.forEach(s => {
+             if (!s || typeof s.restaurant_id !== 'string') return; 
             if (!restaurantScores[s.restaurant_id]) {
               restaurantScores[s.restaurant_id] = { totalScore: 0, voteCount: 0 };
             }
@@ -311,25 +382,27 @@ export async function getFoodFight(foodFightId: string): Promise<GetFoodFightRes
             restaurantScores[s.restaurant_id].voteCount++;
           });
           
-          // Map restaurant details into the aggregate scores
+          // Correct the Map creation type
           const restaurantMap = new Map(restaurantList.map(r => [r.id, r]));
 
           aggregateScoresResult = Object.entries(restaurantScores).map(([id, data]) => {
             const restaurantDetails = restaurantMap.get(id);
+            // Make sure restaurantDetails exist before accessing properties
+            const name = restaurantDetails?.name ?? 'Unknown Restaurant';
+            const cuisine = restaurantDetails?.cuisine ?? 'Unknown';
+            const link = restaurantDetails?.link ?? null;
+            
             return {
                 restaurant_id: id,
-                name: restaurantDetails?.name || 'Unknown Restaurant', 
-                cuisine: restaurantDetails?.cuisine || 'Unknown',
+                name: name, 
+                cuisine: cuisine,
+                link: link, 
                 average_score: data.totalScore / data.voteCount,
                 vote_count: data.voteCount
             }
           });
           
-          // Sort by average score descending
           aggregateScoresResult.sort((a, b) => b.average_score - a.average_score);
-          
-          // Assign calculated aggregate scores
-          aggregateScoresResult = aggregateScoresResult;
       }
     } else {
       // Status is 'voting'
@@ -344,7 +417,7 @@ export async function getFoodFight(foodFightId: string): Promise<GetFoodFightRes
   return {
     foodFight,
     restaurants: restaurantList,
-    winnerDetails,
+    winnerDetails: winnerDetails,
     userScores: userScoresResult,
     aggregateScores: aggregateScoresResult,
   };
@@ -354,58 +427,38 @@ export async function getAllRestaurants() {
   try {
     const { data, error } = await supabase
       .from('restaurants')
-      .select('name, cuisine')
+      .select('id, name, cuisine, link')
       .order('name');
     
     if (error) throw error;
     
-    // De-duplicate restaurants with the same name
-    const uniqueRestaurants = Array.from(
-      new Map(data?.map((item: { name: string; cuisine: string }) => [item.name, item])).values()
-    );
-    
-    return uniqueRestaurants;
+    return data || [];
   } catch (error) {
-    console.error('Error fetching restaurants:', error);
+    console.error('Error fetching all restaurants:', error);
     return [];
   }
 }
 
-export async function deleteRestaurant(restaurantId: string) {
+export async function removeRestaurantFromFoodFight(foodFightId: string, restaurantId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   
   if (!user) throw new Error('Not logged in');
 
-  // Get restaurant to find food fight id
-  const { data: restaurant, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('food_fight_id')
-    .eq('id', restaurantId)
-    .single();
-
-  if (restaurantError) throw restaurantError;
-  if (!restaurant) throw new Error('Restaurant not found');
-
-  // Check food fight status
-  const { data: foodFight, error: foodFightError } = await supabase
-    .from('food_fights')
-    .select()
-    .eq('id', restaurant.food_fight_id)
-    .single();
-
-  if (foodFightError) throw foodFightError;
-  if (!foodFight) throw new Error('Food Fight not found');
-  if (foodFight.status !== 'nominating') throw new Error('Cannot remove restaurant after nomination phase');
-
-  // Delete restaurant
+  // Delete the link from the junction table
   const { error } = await supabase
-    .from('restaurants')
+    .from('food_fight_restauraunt')
     .delete()
-    .eq('id', restaurantId);
+    .eq('food_fight_id', foodFightId)
+    .eq('restaurant_id', restaurantId);
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error removing restaurant from food fight:", error);
+    throw error;
+  }
+
+  console.log(`Restaurant ${restaurantId} removed from food fight ${foodFightId}`);
 }
 
 // New function to submit scores for a user - Updated to accept single score object

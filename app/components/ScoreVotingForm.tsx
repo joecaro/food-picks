@@ -7,13 +7,14 @@ import { AverageScoreDisplay } from "./AverageScoreDisplay";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Utensils } from "lucide-react";
+import { Utensils, Link as LinkIcon } from "lucide-react";
 
-// Define the structure of the Restaurant data actually passed as props
-interface PartialRestaurant {
+// Update interface to include link
+interface Restaurant {
   id: string;
   name: string;
   cuisine: string;
+  link?: string | null; // Add link field
 }
 
 // Define UserScore type inline - align with DB schema (string id)
@@ -21,7 +22,7 @@ type UserScore = { restaurant_id: string; score: number };
 
 interface ScoreVotingFormProps {
   foodFightId: string;
-  restaurants: PartialRestaurant[]; // Expect the partial type
+  restaurants: Restaurant[]; // Expect full Restaurant type
   userScores?: UserScore[]; // Scores previously submitted by the user
   endTime: string | Date;
 }
@@ -160,11 +161,26 @@ export function ScoreVotingForm({
             <Card className="h-full overflow-hidden border-border/40 bg-card/60 backdrop-blur-sm">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-semibold line-clamp-1">{restaurant.name}</h3>
-                    <div className="flex items-center text-muted-foreground">
-                      <Utensils size={14} className="mr-1.5" />
-                      <span className="text-sm">{restaurant.cuisine}</span>
+                  <div className="flex items-start gap-2">
+                    {/* Add Link Icon */}
+                    {restaurant.link && (
+                      <a 
+                        href={restaurant.link}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary shrink-0 mt-1.5" // Added mt-1.5 for alignment
+                        aria-label={`View ${restaurant.name} on external site`}
+                        onClick={(e) => e.stopPropagation()} // Prevent card hover effect triggering
+                      >
+                        <LinkIcon size={14} />
+                      </a>
+                    )}
+                    <div className="space-y-1">
+                      <h3 className="text-xl font-semibold line-clamp-1">{restaurant.name}</h3>
+                      <div className="flex items-center text-muted-foreground">
+                        <Utensils size={14} className="mr-1.5" />
+                        <span className="text-sm">{restaurant.cuisine}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="h-16 flex items-center justify-center">
