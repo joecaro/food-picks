@@ -45,7 +45,7 @@ export default function LoginPage() {
       
       if (error) throw error;
       
-      router.push('/tournaments');
+      router.push('/food-fights');
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Failed to login');
