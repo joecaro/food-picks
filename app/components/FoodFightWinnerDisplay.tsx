@@ -34,10 +34,10 @@ export function FoodFightWinnerDisplay({ winner }: FoodFightWinnerDisplayProps) 
       <CardHeader className="text-center pt-4">
         <div className="flex justify-center items-center mb-2 text-amber-500">
           <Trophy size={28} className="mr-2" />
-          <span className="text-lg font-semibold">Food Fight Winner!</span>
+          <span className="text-lg font-semibold text-primary">Food Fight Winner!</span>
           <Trophy size={28} className="ml-2" />
         </div>
-        <CardTitle className="text-3xl font-bold flex items-center justify-center gap-2">
+        <CardTitle className="text-3xl font-bold flex items-center justify-center gap-2 text-primary">
           {winner.name}
           {/* Add Link Icon */}
           {winner.link && (

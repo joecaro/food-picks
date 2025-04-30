@@ -44,11 +44,11 @@ export function ResultsDisplay({ results }: ResultsDisplayProps) {
               key={result.restaurant_id}
               className={cn(
                 "flex items-center justify-between p-4 border rounded-lg bg-background shadow-sm",
-                index === 0 && "bg-green-50 border-green-400 shadow-green-200/50 shadow-md"
+                index === 0 && "bg-green-50 border-green-400 shadow-green-200/50 shadow-md text-gray-700"
               )}
             >
               <div className="flex items-center space-x-4">
-                <span className="text-lg font-semibold text-primary w-6 text-center">
+                <span className={cn("text-lg font-semibold", index === 0 && "text-gray-700")}>
                   {index + 1}.
                 </span>
                 <div>
@@ -58,11 +58,11 @@ export function ResultsDisplay({ results }: ResultsDisplayProps) {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-xl font-semibold text-primary">
+              <div className={cn("text-right", index === 0 && "text-gray-700")}>
+                <p className={cn("text-xl font-semibold", index === 0 && "text-gray-700")}>
                   {formatScore(result.average_score)} Avg
-                </p>
-                <p className="text-xs text-muted-foreground">
+                </p>  
+                <p className={cn("text-xs text-muted-foreground", index === 0 && "text-gray-700")}>
                   ({result.vote_count}{" "}
                   {result.vote_count === 1 ? "vote" : "votes"})
                 </p>
